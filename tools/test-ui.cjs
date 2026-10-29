@@ -116,9 +116,10 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   await p.keyboard.press('KeyU'); await sleep(400);
   const ph = await E(() => ['pAtt', 'pThr', 'pRud'].map(id => { const h = document.querySelector(`.uih[data-id="${id}"]`); return h ? h.textContent.trim().slice(0, 20) : null; }));
   ok('plane HUD elements have editor handles', ph.every(Boolean), ph);
+  await tapSel('#uiedP [data-a="col"]'); await sleep(200); // collapse the panel so the HUD is reachable
   const t0 = await rect('pThr'); await drag('pThr', -120, -40); await sleep(150); const t1 = await rect('pThr');
   await p.screenshot({ path: SH + 'ui_edit_plane.png' });
-  await p.keyboard.press('KeyU'); await sleep(300);
+  await tapSel('#uiedP [data-a="col"]'); await p.keyboard.press('KeyU'); await sleep(300);
   const sv = await E(() => JSON.parse(localStorage.getItem('srui_layout')).el.pThr);
   ok('plane throttle draggable + saved', Math.abs(t1.cx - t0.cx + 120) < 10 && Math.abs(t1.cy - t0.cy + 40) < 10 && sv && sv.x !== undefined, { t0: [t0.cx, t0.cy], t1: [t1.cx, t1.cy], sv });
   await E(() => __st.setCraft('car')); await sleep(800);

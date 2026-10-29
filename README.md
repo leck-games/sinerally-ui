@@ -15,6 +15,49 @@ Live: **https://leck-games.github.io/sinerally-ui/** (installs as its own home-s
 - Works with UI modes FULL / MINIMAL / NONE (I key / UI MODE button): your hidden flags are respected in every mode.
 - Test: `python3 -m http.server 18941 --bind 127.0.0.1` then `node tools/test-ui.cjs` (iPhone 12 landscape, synthetic touch).
 
+## Planes (✈) — 2026-10-29
+Three flyable aircraft with an arcade-friendly flight model (lift / drag / stall / thrust, rate-based controls, auto-coordination):
+- **BUSH CUB** – slow, forgiving STOL taildragger with tundra tyres; lands on dirt strips and meadows.
+- **STUNT X** – aerobatic monoplane, huge roll rate, inverted-capable, loops allowed.
+- **SINE JET** – fast, needs paved runways, afterburner (Shift / BURN).
+
+Procedural airfields (paved + dirt strips, windsocks, hangars) are generated in the math world and shown on the minimap
+(nearest field + distance). Landing gear rides the terrain; **crashes**: trees ("HIT A TREE"), nose-in/prop strike, hard landings,
+gear collapse, water. After a crash the plane auto-resets to the nearest suitable runway. Works with ARCADE and NORMAL handling
+(NORMAL = less auto-levelling, real stalls). Chase camera, fog + draw distance stretch with altitude, prop/jet sound via the
+engine-sound plugin host. Flight HUD (attitude, IAS, ALT, VS, heading), throttle slider and rudder buttons are registered in the
+layout editor (✈ FLIGHT HUD / ✈ THROTTLE / ✈ RUDDER).
+
+Switching: ☰ → VEHICLE → **✈ PLANES** tab (3D preview), or ☰ → ✈ FLY A PLANE / 🚗 DRIVE CAR, or key **P**; **V** cycles planes.
+In the plane menu: RESET TO RUNWAY, AIR START, ✈ <airfield> to teleport to a field. The choice persists (`sinerally_craft`).
+
+| | Keyboard | Touch (iPhone landscape) |
+|---|---|---|
+| Roll | A / D or ← / → | joystick left/right (or tilt) |
+| Pitch | ↑ nose down, ↓ nose up | joystick up/down (☰ PLANE PITCH: Stick / Inverted) |
+| Throttle | W / S | THR+ / THR− buttons, throttle slider |
+| Rudder | Q / E | ◀R / R▶ |
+| Wheel brake | Space | BRAKE |
+| Afterburner (jet) | Shift | BURN |
+
+## Graphics quality (☰ GFX button / menu) — LOW · MED · HIGH · ULTRA
+MED is the phone default. The choice is stored in `localStorage.sinerally_q3`; URL override `?q=low|med|high|ultra`
+(`&dyn=0` turns off the dynamic-resolution fallback).
+
+| | LOW | MED | HIGH | ULTRA |
+|---|---|---|---|---|
+| pixel ratio (cap) | 1 | 1.5 | 2 | 3 |
+| HD road textures (asphalt grain, cracks, patches, lane paint wear, dirt ruts, anisotropic filtering) | – | – | 512×1024 | 1024×2048 |
+| terrain micro-detail | – | – | 0.7 | 1.0 |
+| grass blades | 7k | 11k | 16k | 24k |
+| projected vehicle/plane shadow | – | – | 512 | 1024 |
+| draw distance (terrain grid; applied on reload) | 1× | 1× | ~1.12× | ~1.3× |
+
+Tests (headless Chrome, 844×390, serve the repo on :18941; test-update uses :18931):
+`node tools/test-plane.cjs` (23 checks), `node tools/test-gfx.cjs` (11 checks + fps/triangles per level → `shots/gfx_perf.json`),
+`node tools/test-ui.cjs` (35 checks incl. plane HUD), `node tools/test-update.cjs` (20 checks).
+
+
 ---
 # SineRally – math-world offroad free-roam (FUEL-style)
 Run: `python3 -m http.server 8000 --bind 0.0.0.0` in this folder, open http://localhost:8000 (or http://<PC-LAN-IP>:8000 on a phone on the same Wi-Fi). Live: https://leck-games.github.io/sinerally/

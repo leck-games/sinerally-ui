@@ -542,6 +542,7 @@ $('mZin').onclick = () => { mapSpan = Math.max(1500, mapSpan / 2); openMap(true)
 addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (e.code === 'KeyM' || e.code === 'Tab') { openMap(!mapOpen); e.preventDefault(); } if (e.code === 'Escape') { openMap(false); openMenu(false); editor.close(); if (uied) uied.close(); }
   if (uied && uied.open) { if (e.code === 'KeyU') uied.close(); return; } // layout editor open: game keys paused
+  if (e.code === 'KeyP' && !editorOpen()) { setCraft(craft === 'plane' ? 'car' : 'plane'); return; }
   if (e.code === 'KeyV') { if (craft === 'plane') { const i = PLANES.findIndex(p => p.id === plDef.id); setCraft('plane', PLANES[(i + 1) % PLANES.length].id); } else { const l = listVehicles(), i = l.findIndex(v => v.id === vDef.id); setVehicle(l[(i + 1) % l.length].id); } } if (e.code === 'KeyP') setCraft(craft === 'plane' ? 'car' : 'plane'); if (e.code === 'KeyU') { if (e.shiftKey) rig.unload(); else uied.openEd(); } /* U = EDIT UI (unload moved to Shift+U) */ if (e.code === 'KeyH') setHandling(hMode === 'arcade' ? 'normal' : 'arcade'); if (e.code === 'KeyI') cycleUi(); });
 // ---------- HUD toggles: handling ARC/NRM, UI hide (FULL → MINIMAL → NONE), unload (only with logs) ----------
 function setHandling(m) { hMode = m === 'normal' ? 'normal' : 'arcade'; rig.setMode(hMode); localStorage.setItem('sinerally_handling', hMode); store.set('srp_handling', hMode);

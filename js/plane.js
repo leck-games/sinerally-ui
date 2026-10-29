@@ -111,7 +111,7 @@ export function spawnRunway(s, af, end = 0, groundAt) {
   s.p.set(x, groundAt(x, z) - lo + 0.03, z); reset(s); return s;
 }
 export function spawnAir(s, x, z, y, yaw, speed) { s.q.setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ')); basis(s); s.p.set(x, y, z); reset(s); s.v.copy(s.fwd).multiplyScalar(speed); s.thr = s.thrA = 0.7; s.onGround = false; return s; }
-function reset(s) { s.v.set(0, 0, 0); s.w.set(0, 0, 0); s.crashed = false; s.crashT = 0; s.cause = ''; s.thr = s.thrA = 0; s.damage = 0; s.air = 0; s.airT = 0; s.maxAgl = 0; s.stall = false; s.onGround = true; s.gearN = 3; s.grounded = 3; }
+function reset(s) { s.v.set(0, 0, 0); s.ias = 0; s.vs = 0; s.rpm = 0; s.w.set(0, 0, 0); s.crashed = false; s.crashT = 0; s.cause = ''; s.thr = s.thrA = 0; s.damage = 0; s.air = 0; s.airT = 0; s.maxAgl = 0; s.stall = false; s.onGround = true; s.gearN = 3; s.grounded = 3; }
 
 // one fixed step. inp: { pitch -1..1 (+ nose up), roll -1..1 (+ right), yaw -1..1 (+ right), thr 0..1, brake 0..1, boost bool }
 // env: { groundAt(x,z), waterLevel, trees(x,z,r) -> [{id,x,z,r}], treeTop(id) -> height, hitTree(id, dir), solids: [{x,z,r,h}], arcade bool, emit(type, data) }

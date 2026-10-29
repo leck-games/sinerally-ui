@@ -77,8 +77,8 @@ const AP_SRC = `(() => {
   ok('plane HUD draws (horizon/IAS/ALT) + telemetry line', hudPix > 4000, { hudPix, tel });
   await p.screenshot({ path: SH + 'plane_hud.png', clip: { x: 300, y: 30, width: 344, height: 130 } });
   // turn
-  const h0 = (await S()).hdg; await AP({ mode: 'hold', hdg: (h0 + 90) % 360 }); await sleep(14000); const h1 = await S();
-  const dh = Math.abs(((h1.hdg - h0 + 540) % 360) - 180);
+  const h0 = (await S()).hdg; await AP({ mode: 'hold', hdg: (h0 + 90) % 360 }); let h1, dh = 0; const tT = Date.now(); // wall-clock budget: sim speed depends on software-GL fps
+  do { await sleep(1000); h1 = await S(); dh = Math.abs(((h1.hdg - h0 + 540) % 360) - 180); } while (!h1.cr && dh < 60 && Date.now() - tT < 30000);
   ok('banked turn (heading change ≥ 45°) without losing it', !h1.cr && dh >= 45, { h0, h1: h1.hdg, dh, agl: h1.agl });
   // ---- approach + landing on the nearest airfield: start on a 4° glide path 650 m out, aligned with the runway
   const ap = await E(() => { const s = __st.plane, af = __st.pickField(__st.planeDef, s.p.x, s.p.z), d = 650 + af.L / 2, x = af.x - af.dx * d, z = af.z - af.dz * d;

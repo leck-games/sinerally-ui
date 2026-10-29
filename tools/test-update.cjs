@@ -7,7 +7,7 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const p = await b.newPage(); await p.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const errs = []; p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); }); p.on('pageerror', e => errs.push('PAGEERR ' + e.message));
-  const URL = 'http://127.0.0.1:18931/?gfx=Med';
+  const URL = 'http://127.0.0.1:18931/?q=med&dyn=0';
   await p.goto(URL, { waitUntil: 'load' }); await p.evaluate(() => localStorage.clear()); await p.reload({ waitUntil: 'load' }); await sleep(4000);
   const E = (f, ...a) => p.evaluate(f, ...a);
   const hook = () => E(() => { window.__ev = []; __st.bus.on('*', (d, t) => __ev.push([t, d])); });

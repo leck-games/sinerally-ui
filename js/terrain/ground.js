@@ -126,8 +126,8 @@ function createGrass(scene, grid, { count = 12000, tile = 72 } = {}) {
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; scene.add(mesh);
   return { mesh, update(cx, cz) { mat.uniforms.uCenter.value.set(cx, cz); } };
 }
-export function createGround(scene, { small = false, grassCount } = {}) {
-  const NEAR_N = small ? 112 : 128, NEAR_S = 4, FAR_N = small ? 80 : 96, FAR_S = 16;
+export function createGround(scene, { small = false, grassCount, nearN, farN } = {}) { // nearN/farN: graphics-level grid sizes (load time)
+  const NEAR_N = nearN || (small ? 112 : 128), NEAR_S = 4, FAR_N = farN || (small ? 80 : 96), FAR_S = 16;
   const uNear = { value: new THREE.Vector3() };
   const far = new Grid(scene, FAR_N, FAR_S, gridTerrainMat({ far: true, uNear }), false), near = new Grid(scene, NEAR_N, NEAR_S, gridTerrainMat(), true);
   const farDist = FAR_N * FAR_S / 2 + 40;

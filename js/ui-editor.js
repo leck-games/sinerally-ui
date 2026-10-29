@@ -10,8 +10,9 @@ export const ELEMENTS = [
   ['spdgrp', 'SPEEDO', 'm'], ['race', 'RACE', 'm'], ['mini', 'MINIMAP', 'm'], ['cans', 'FUEL', 'm'], ['wp', 'WAYPOINT', 'm'],
   ['topbtns', 'TOP BAR', 'm'], ['tMenu', '☰ MENU', 's', 'e'], ['tReset', 'RESET', 's'], ['tQ', 'GFX', 's'], ['tTilt', 'TILT', 's'], ['tDbg', 'FPS', 's'], ['tSnd', 'SOUND', 's'],
   ['dbg', 'DEBUG', 'm'], ['gauge', 'GAUGE+TEMP', 'm'], ['joy', 'JOYSTICK', 'm'], ['bBst', 'BOOST', 'm'], ['bDrf', 'DRIFT', 'm'],
-  ['bGas', 'GAS', 'm'], ['bBrk', 'BRAKE', 'm'], ['bUnl', 'UNLOAD', 'm'], ['tUi', 'UI MODE', 'm', 'e'], ['tHand', 'ARC/NRM', 'm']];
-const META = Object.fromEntries(ELEMENTS.map(([id, label, kind, f]) => [id, { id, label, kind, ess: f === 'e', flex: id === 'topbtns' || /^b(Gas|Brk|Bst|Drf)$/.test(id) }]));
+  ['bGas', 'GAS', 'm'], ['bBrk', 'BRAKE', 'm'], ['bUnl', 'UNLOAD', 'm'], ['tUi', 'UI MODE', 'm', 'e'], ['tHand', 'ARC/NRM', 'm'],
+  ['pAtt', '✈ FLIGHT HUD', 'm'], ['pThr', '✈ THROTTLE', 'm'], ['pRud', '✈ RUDDER', 'm']]; // plane HUD (shown in plane mode; always editable here)
+const META = Object.fromEntries(ELEMENTS.map(([id, label, kind, f]) => [id, { id, label, kind, ess: f === 'e', flex: id === 'topbtns' || /^(b(Gas|Brk|Bst|Drf)|pRud)$/.test(id) }]));
 const NOTX = new Set(['gauge', 'wp', 'race']); // their CSS centres them with translateX(-50%): dropped once they are placed explicitly
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), r1 = v => Math.round(v * 100) / 100;
 const blank = () => ({ v: LAYOUT_VERSION, g: { o: 1, s: 1 }, snap: true, flip: false, el: {} });
@@ -21,7 +22,7 @@ export const PRESETS = {
   clean: () => ({ v: LAYOUT_VERSION, g: { o: 0.9, s: 1 }, snap: true, flip: false, el: {
     tReset: { h: 1 }, tQ: { h: 1 }, tTilt: { h: 1 }, tDbg: { h: 1 }, tSnd: { h: 1 }, dbg: { h: 1 }, cans: { h: 1 }, tHand: { h: 1 },
     mini: { s: 0.8, o: 0.85 }, gauge: { s: 0.85, o: 0.85 }, race: { o: 0.8 }, tUi: { o: 0.5 },
-    joy: { o: 0.55 }, bGas: { o: 0.55 }, bBrk: { o: 0.55 }, bBst: { o: 0.55 }, bDrf: { o: 0.55 } } })
+    joy: { o: 0.55 }, bGas: { o: 0.55 }, bBrk: { o: 0.55 }, bBst: { o: 0.55 }, bDrf: { o: 0.55 }, pThr: { o: 0.6 }, pRud: { o: 0.55 }, pAtt: { s: 0.9, o: 0.85 } } })
 };
 // sanitise anything that came from storage / import into a valid v1 layout (unknown ids and junk dropped, numbers clamped)
 export function normalize(raw) {

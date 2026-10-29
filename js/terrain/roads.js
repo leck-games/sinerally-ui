@@ -2,6 +2,7 @@
 // Asphalt highways get edge lines + dashed centre line, dirt trails/loops get wheel ruts; bridges get a deck slab, rails and pillars.
 import * as THREE from 'three';
 import { pathsNear, pathPoint, PP, HWY, LOOP, WATER } from './world.js';
+import { asphaltHD, dirtHD } from './roadhd.js';
 
 function canvasTex(draw) {
   const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d'); draw(g);
@@ -74,8 +75,24 @@ export function createRoads(scene, mk) { // mk(kind:'asphalt'|'dirt'|'bridge', t
     box(b, x - nx * (hw + 0.4), y + 0.6, z - nz * (hw + 0.4), PP.tx, PP.tz, 0.15, 0.5, ds * 0.5 + 0.05);
     if (i % 5 === 0) { const bot = WATER - 4, h = (y - 1.1 - bot) / 2; if (h > 0.5) box(b, x, bot + h, z, PP.tx, PP.tz, hw * 0.7, h, 0.8); }
   }
+  // graphics detail: 0 = classic 64x256 canvases (LOW/MED), 1 = HIGH (512x1024), 2 = ULTRA (1024x2048) + normal/roughness maps, max anisotropy, mipmaps
+  const hd = {}; let detail = 0;
+  function dataTex(d, colour, aniso) { const t = new THREE.DataTexture(colour ? d.col : d.nrm, d.w, d.h, THREE.RGBAFormat); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = aniso; t.colorSpace = colour ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.needsUpdate = true; return t; } // colour in sRGB like the classic canvases
+  function setDetail(level, aniso = 4) {
+    level = Math.max(0, Math.min(2, level | 0)); if (level === detail && (level === 0 || hd[level])) { for (const t of [asphaltTex, dirtTex]) t.anisotropy = level ? aniso : 4; return detail; }
+    for (const k of Object.keys(hd)) if (+k !== level) { for (const t of hd[k].tex) t.dispose(); delete hd[k]; } // keep only the active level in VRAM
+    if (level && !hd[level]) { const t0 = performance.now(), W = level === 2 ? 1024 : 512, a = asphaltHD(W, W * 2), d = dirtHD(W, W * 2);
+      hd[level] = { a, d, tex: [dataTex(a, 1, aniso), dataTex(a, 0, aniso), dataTex(d, 1, aniso), dataTex(d, 0, aniso)], ms: performance.now() - t0 }; }
+    detail = level; const h = hd[level];
+    for (const t of [asphaltTex, dirtTex]) { t.anisotropy = level ? aniso : 4; t.needsUpdate = true; }
+    const set = (m, map, nmap, vs) => { m.uniforms.map.value = map; m.uniforms.nmap.value = nmap; m.uniforms.uHD.value = nmap ? 1 : 0; m.uniforms.uVS.value = vs; };
+    if (!h) { set(matA, asphaltTex, null, 1); set(matD, dirtTex, null, 1); }
+    else { set(matA, h.tex[0], h.tex[1], 14 / 48); set(matD, h.tex[2], h.tex[3], h.d.vs); }
+    return detail;
+  }
   return {
-    meshes,
+    meshes, setDetail, get detail() { return detail; }, get hdStats() { const h = hd[detail]; return h ? { level: detail, size: h.a.w + 'x' + h.a.h, genMs: Math.round(h.ms) } : { level: 0 }; },
     update(px, pz, force) { if (!force && Math.hypot(px - lx, pz - lz) < 140) return; lx = px; lz = pz; build(px, pz); },
   };
 }

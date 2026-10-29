@@ -7,7 +7,7 @@ const dtex = (w, h, data, type = THREE.UnsignedByteType) => { const t = new THRE
 export const U = {
   uSun: { value: new THREE.Vector3(0.45, 0.75, 0.35).normalize() },
   uHorizon: { value: new THREE.Color(0xd9f1ff) }, uZenith: { value: new THREE.Color(0x1f74e0) },
-  uPx: { value: 1 }, uHatch: { value: 1 }, uFar: { value: 800 }, uTime: { value: 0 },
+  uPx: { value: 1 }, uHatch: { value: 1 }, uFar: { value: 800 }, uTime: { value: 0 }, uFogY: { value: 1 }, uDet: { value: 0 }, // uDet: HIGH/ULTRA terrain micro-detail; uFogY: weight of the vertical distance in fog (planes: <1 at altitude)
   uLight: { value: new THREE.Color(1, 1, 1) }, uAmb: { value: 1 }, uRim: { value: 1 }, uHeadK: { value: 0 },
   uHeadP: { value: new THREE.Vector3() }, uHeadD: { value: new THREE.Vector3(0, 0, 1) }, uNight: { value: 0 }, uRain: { value: 0 },
   // environment (weather.js / fire.js keep these current)
@@ -36,7 +36,7 @@ float wetAt(vec2 xz){ vec2 uv = (xz - uWetO.xy) / uWetO.z; if (uv.x < 0. || uv.y
 vec3 fireAt(vec2 xz){ vec2 d = xz - uFireO.xy; if (uFireO.w < 0.5 || d.x < 0. || d.y < 0. || d.x >= uFireO.z || d.y >= uFireO.z) return vec3(0.); return texture2D(uFireT, xz / uFireO.z).rgb; }
 `;
 export const COMIC = /* glsl */`
-uniform vec3 uSun; uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uPx; uniform float uHatch; uniform float uFar; uniform float uTime;
+uniform vec3 uSun; uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uPx; uniform float uHatch; uniform float uFar; uniform float uTime; uniform float uFogY; uniform float uDet;
 uniform vec3 uLight; uniform float uAmb, uRim, uHeadK, uNight, uRain; uniform vec3 uHeadP, uHeadD;
 ` + GLSL_ENV + /* glsl */`
 vec3 headLight(vec3 al, vec3 N, vec3 wpos){
@@ -55,7 +55,8 @@ float cloudShadow(vec3 w){ // halftone-edged cloud shadow mask 0..1
   return max(step(0.75, s), dots) * uCloudK;
 }
 float hatchLine(float c, float w){ float d = abs(fract(c) - 0.5) * 2.0; return 1.0 - smoothstep(w, w + 0.12, 1.0 - d); }
-vec3 fogMix(vec3 col, vec3 wpos, float k){ float dist = length(wpos - cameraPosition); float f = smoothstep(uFar * 0.2 * k, uFar * k, dist); return mix(col, uHorizon, f * f); }
+float fogD(vec3 wpos){ vec3 d = wpos - cameraPosition; d.y *= uFogY; return length(d); }
+vec3 fogMix(vec3 col, vec3 wpos, float k){ float dist = fogD(wpos); float f = smoothstep(uFar * 0.2 * k, uFar * k, dist); return mix(col, uHorizon, f * f); }
 vec3 comicL(vec3 albedo, vec3 N, vec3 wpos, float hatchK, float shade){
   vec3 V = normalize(cameraPosition - wpos);
   float l = (dot(N, uSun) * 0.5 + 0.5) * (1.0 - 0.45 * shade);
@@ -125,6 +126,14 @@ export function gridTerrainMat({ far = false, uNear = null } = {}) {
         float dk = step(0.6, sin(x*0.4 + z*0.33 + sin(z*0.2)*2.));
         m = mix(m, vec3(mix(1.0, .88, dk) * mix(1., 1.14, step(0.9, spk))), vS.w);
         c *= m;
+        #ifndef FAR
+        if (uDet > 0.001) { // HIGH/ULTRA: close-range micro grain (pebbles / soil clods / grass blades), fades out by ~150 m
+          float dd = length(vW - cameraPosition), kd = uDet * (1. - smoothstep(25., 150., dd));
+          if (kd > 0.001) { vec2 cc = floor(vW.xz * 5.); float g1 = fract(sin(dot(cc, vec2(12.9898, 78.233))) * 43758.5453);
+            float g2 = sin(x*4.3 + sin(z*3.1)*2.) * sin(z*3.7 + sin(x*2.9)*2.);
+            c *= 1. + kd * ((g1 - .5) * 0.16 + step(0.55, g2) * 0.07 - step(0.93, g1) * 0.12); }
+        }
+        #endif
         float wet0 = 1. - smoothstep(0.0, 0.8, h); c = mix(c, c * vec3(.7,.75,.8), wet0);
         c = wetShade(c, N, vW, wetAt(vW.xz) * (1. - vS.y * 0.5));
         // fire state: burnt ground (charcoal + ash speckle + inked edge), burning (glowing bands), smoulder (night embers)
@@ -182,14 +191,30 @@ export function waterMat({ far = false, uNear = null } = {}) {
       }` });
 }
 export function roadMat(map, { offset = -2, col = 0x9a9aa2 } = {}) {
-  return new THREE.ShaderMaterial({ uniforms: { ...U, map: { value: map }, uCol: { value: new THREE.Color(col) } }, defines: map ? { MAP: 1 } : {},
+  // HIGH/ULTRA (uHD > 0): hi-res colour map + normal/roughness map (rg = normal xy, b = roughness), v scaled by uVS so the
+  // detailed tile covers more road; bump light + stepped specular are added on top of the comic bands (geometric N keeps the ink edges clean)
+  return new THREE.ShaderMaterial({ uniforms: { ...U, map: { value: map }, nmap: { value: null }, uHD: { value: 0 }, uVS: { value: 1 }, uCol: { value: new THREE.Color(col) } }, defines: map ? { MAP: 1 } : {},
     polygonOffset: !!map, polygonOffsetFactor: offset, polygonOffsetUnits: offset * 2,
     vertexShader: `varying vec3 vW; varying vec3 vN; varying vec2 vUv;
       void main(){ vUv = uv; vec4 w = modelMatrix * vec4(position,1.); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: COMIC + `uniform sampler2D map; uniform vec3 uCol; varying vec3 vW; varying vec3 vN; varying vec2 vUv;
+    fragmentShader: COMIC + `uniform sampler2D map; uniform sampler2D nmap; uniform float uHD, uVS; uniform vec3 uCol; varying vec3 vW; varying vec3 vN; varying vec2 vUv;
       void main(){ vec3 N = normalize(vN);
         #ifdef MAP
-          vec3 c = texture2D(map, vUv).rgb; float hk = 0.5;
+          vec2 uv = vec2(vUv.x, vUv.y * uVS);
+          vec3 c = texture2D(map, uv).rgb; float hk = 0.5;
+          if (uHD > 0.) {
+            vec4 nm = texture2D(nmap, uv); vec3 tn = normalize(vec3((nm.xy * 2. - 1.) * 1.6, 1.));
+            vec3 dp1 = dFdx(vW), dp2 = dFdy(vW); vec2 du1 = dFdx(uv), du2 = dFdy(uv);
+            vec3 p2 = cross(dp2, N), p1 = cross(N, dp1); vec3 Tg = p2 * du1.x + p1 * du2.x, Bg = p2 * du1.y + p1 * du2.y;
+            float im = inversesqrt(max(1e-12, max(dot(Tg, Tg), dot(Bg, Bg))));
+            vec3 N2 = normalize(mat3(Tg * im, Bg * im, N) * tn);
+            float dd = length(vW - cameraPosition), fade = 1. - smoothstep(60., 260., dd);
+            c *= 1. + (dot(N2, uSun) - dot(N, uSun)) * 1.6 * fade * uHD;
+            float wt = wetAt(vW.xz), rough = mix(nm.z, nm.z * 0.35, wt);
+            vec3 V = normalize(cameraPosition - vW), Hh = normalize(uSun + V);
+            float sp = pow(max(dot(N2, Hh), 0.), 48.) * (1. - rough) * (1. - uNight);
+            c += uLight * (step(0.5, sp) * 0.22 + step(0.15, sp) * 0.08) * fade;
+          }
         #else
           vec3 c = uCol; float hk = 1.2;
         #endif

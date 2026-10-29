@@ -92,7 +92,17 @@ body.ui-none #tUi{right:max(10px,env(safe-area-inset-right));opacity:.28;box-sha
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Sine Rally UI">
 <meta name="theme-color" content="#ff6a1a"><meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<style>/* iOS home-screen */canvas{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#allBuilds{display:inline-block;text-decoration:none;font:900 12px "Arial Black",system-ui,sans-serif;color:#111;background:#fff;border:3px solid #111;border-radius:6px;padding:5px 9px;box-shadow:3px 3px 0 #111;-webkit-tap-highlight-color:transparent}</style>
+<style>/* iOS home-screen */canvas{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#allBuilds{display:inline-block;text-decoration:none;font:900 12px "Arial Black",system-ui,sans-serif;color:#111;background:#fff;border:3px solid #111;border-radius:6px;padding:5px 9px;box-shadow:3px 3px 0 #111;-webkit-tap-highlight-color:transparent}/* SineRally UI: plane HUD (artificial horizon, throttle slider, rudder) — shown in plane mode, editable in the UI editor */
+#pAtt{position:fixed;left:calc(50% - 30px);top:calc(max(6px,env(safe-area-inset-top)) + 40px);width:210px;height:104px;display:none;pointer-events:none;filter:drop-shadow(3px 3px 0 #1116)}
+#pThr{position:fixed;right:calc(max(22px,env(safe-area-inset-right)) + 186px);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:44px;height:150px;display:none;border:4px solid #111;border-radius:10px;background:#fff3;box-shadow:4px 4px 0 #1118;touch-action:none;overflow:hidden;z-index:4}
+#pThrF{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#ff8a1a,#ffd23c)}#pThrV{position:absolute;left:0;right:0;top:4px;text-align:center;font:900 12px "Arial Black",system-ui;color:#fff;-webkit-text-stroke:.8px #111}
+#pThr::after{content:"THR";position:absolute;left:0;right:0;bottom:4px;text-align:center;font:900 10px "Arial Black",system-ui;color:#111}
+#pRud{position:fixed;left:calc(max(12px,env(safe-area-inset-left)) + 238px);bottom:calc(14px + env(safe-area-inset-bottom,0px));display:none;gap:8px}
+#pRud .sb{width:44px;height:40px;padding:0;font-size:15px}#pRud .sb.on{background:#ff6a1a;color:#fff}
+body.plane #pAtt,body.plane #pThr{display:block}body.plane.touch #pRud{display:flex}body.plane #bUnl{display:none!important}body.plane.noab #bBst{display:none!important}
+body.plane #carinfo{display:block}body.ui-none #pAtt{display:none!important}body.ui-none #pThr,body.ui-none #pRud{opacity:0}
+@media (max-height:420px){#pThr{height:130px}}
+</style>
 <style>/* SineRally UI: custom HUD layout (js/ui-editor.js). Per-element opacity x global opacity; hidden flag; edit mode overlay */
 .uie{opacity:calc(var(--uo,1) * var(--ugo,1))}.uie.uie-sub{opacity:var(--uo,1)}.uie-h{display:none!important}
 body.uied .uie{display:block!important}body.uied .uie-f{display:flex!important}body.uied .uie-h{opacity:.3!important;outline:3px dashed #e8302a}
@@ -125,6 +135,7 @@ body.uied .uie{display:block!important}body.uied .uie-f{display:flex!important}b
 <div id="joy"><div id="knob"></div></div>
 <div class="btn" id="bGas">GAS</div><div class="btn" id="bBrk">BRAKE</div><div class="btn" id="bBst">BOOST</div><div class="btn" id="bDrf">DRIFT</div>
 <canvas id="gauge" width="200" height="120"></canvas>
+<canvas id="pAtt" width="210" height="104"></canvas><div id="pThr"><div id="pThrF"></div><div id="pThrV">0</div></div><div id="pRud"><button class="sb" id="pRL">◀R</button><button class="sb" id="pRR">R▶</button></div>
 <button class="sb" id="bUnl">UNLOAD</button><button class="sb" id="tUi" title="UI">◉</button><button class="sb" id="tHand" title="Handling (H)">ARC</button>
 <div id="labels"></div><div id="msg" class="ink"></div><div id="rot">ROTATE TO LANDSCAPE ↻</div>
 <script type="importmap">{"imports":{"three":"./js/three.module.js"}}</script>

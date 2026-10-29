@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { U } from './terrain/comic.js';
 export { U };
 export const COMIC = /* glsl */`
-uniform vec3 uSun; uniform vec3 uHorizon; uniform float uPx; uniform float uHatch; uniform float uFar; uniform float uTime;
+uniform vec3 uSun; uniform vec3 uHorizon; uniform float uPx; uniform float uHatch; uniform float uFar; uniform float uTime; uniform float uFogY;
+float fogD(vec3 wpos){ vec3 d = wpos - cameraPosition; d.y *= uFogY; return length(d); }
 uniform vec3 uLight; uniform float uAmb, uRim, uHeadK; uniform vec3 uHeadP, uHeadD;
 vec3 headLight(vec3 al, vec3 N, vec3 wpos){ // two-beam cone from the car, hard comic falloff
   vec3 d = wpos - uHeadP; float r = length(d); d /= max(r, 0.001);
@@ -35,7 +36,7 @@ vec3 comic(vec3 albedo, vec3 N, vec3 wpos, float hatchK){
   // ink rim: grazing surfaces (hill silhouettes, object outlines) go black - works without the post pass
   float ndv = dot(N, V);
   col = mix(col, vec3(0.04, 0.03, 0.05), (1.0 - smoothstep(0.06, 0.11, ndv)) * (1.0 - smoothstep(0.7, 0.9, abs(N.y))) * (1.0 - smoothstep(40.0, 160.0, dist)) * uRim); // not on flat ground
-  float f = smoothstep(uFar * 0.2, uFar, dist);
+  float f = smoothstep(uFar * 0.2, uFar, fogD(wpos));
   return mix(col, uHorizon, f * f * 0.95);
 }
 float ncode(vec3 N){ vec3 v = normalize(mat3(viewMatrix) * N); return 0.08 + 0.84 * (0.5 + 0.5 * dot(v, vec3(0.42, 0.55, 0.72))); }
@@ -111,7 +112,7 @@ export function waterMat({ far = false, uNear = null } = {}) { // far: engine fa
         vec3 V = normalize(cameraPosition - vW); float sp = dot(reflect(-uSun, N), V);
         c = mix(c, vec3(1.), step(0.985, sp));          // toon specular glints
         c = mix(c, vec3(.97,1.,1.), foam);
-        float dist = length(vW - cameraPosition); float f = smoothstep(uFar*0.2, uFar, dist);
+        float dist = fogD(vW); float f = smoothstep(uFar*0.2, uFar, dist);
         c *= uLight; c += uHeadK * headLight(c, vec3(0.,1.,0.), vW);
         gl_FragColor = vec4(mix(c, uHorizon, f*f*0.95), ncode(vec3(0.,1.,0.)) + foam * 0.04);
       }` });
@@ -207,7 +208,7 @@ export function puffMat() {
         float r = dot(p,p) / (lump * lump); if (r > 1.) discard;
         vec2 g = fract(gl_FragCoord.xy / (uPx * 4.)) - 0.5; if (r > 0.55 && length(g) > 0.62 * (1. - r) + 0.12) discard;
         vec3 N = normalize(vec3(p.x, -p.y, sqrt(1. - r))); N = normalize(inverse(mat3(viewMatrix)) * N);
-        float l = dot(N, uSun); vec3 c = vC * (l > 0.1 ? 1.0 : 0.8) * uLight; float dist = length(vW - cameraPosition); float f = smoothstep(uFar*0.2, uFar, dist);
+        float l = dot(N, uSun); vec3 c = vC * (l > 0.1 ? 1.0 : 0.8) * uLight; float dist = fogD(vW); float f = smoothstep(uFar*0.2, uFar, dist);
         gl_FragColor = vec4(mix(c, uHorizon, f*f), ncode(N)); }` });
 }
 // ---------------- flat dark decal (skids, blob shadow) ----------------
@@ -221,7 +222,7 @@ export function decalMat(col, dots = false) {
           vec2 p = vUv * 2. - 1.; float r = length(p); if (r > 1.) discard;
           vec2 g = fract(gl_FragCoord.xy / (uPx * 5.)) - 0.5; if (length(g) > 0.5 * (1. - r * 0.8) + 0.08) discard;
         #endif
-        float dist = length(vW - cameraPosition); float f = smoothstep(uFar*0.2, uFar, dist);
+        float dist = fogD(vW); float f = smoothstep(uFar*0.2, uFar, dist);
         gl_FragColor = vec4(mix(uCol, uHorizon, f*f), ncode(vec3(0.,1.,0.)) ); }` });
 }
 // ---------------- post: ink edges (depth laplacian + normal code), posterize, halftone, grain, speed lines ----------------

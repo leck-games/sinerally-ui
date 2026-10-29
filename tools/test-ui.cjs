@@ -2,7 +2,7 @@
 // Serve the repo: python3 -m http.server 18941 --bind 127.0.0.1 ; then node tools/test-ui.cjs  (screenshots -> shots/ui_*.png)
 let puppeteer; try { puppeteer = require('puppeteer-core'); } catch (e) { puppeteer = require('/workspace/scratch/ptest/node_modules/puppeteer-core'); }
 const SH = require('path').join(__dirname, '..', 'shots') + '/'; const sleep = ms => new Promise(r => setTimeout(r, ms));
-const PORT = process.env.PORT || 18941, URL = `http://127.0.0.1:${PORT}/?gfx=Med`;
+const PORT = process.env.PORT || 18941, URL = `http://127.0.0.1:${PORT}/?q=med&dyn=0`;
 const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; console.log((v ? 'PASS ' : 'FAIL ') + k, info !== undefined ? JSON.stringify(info) : ''); };
 (async () => {
   const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
@@ -111,6 +111,18 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   ok('left-handed: GAS button on the left drives', (await E(() => Math.hypot(__st.veh.v.x, __st.veh.v.z))) > 1);
   await sleep(800); await p.screenshot({ path: SH + 'ui_lefthanded_play.png' });
   await E(() => __st.setUi('minimal')); await sleep(400); await p.screenshot({ path: SH + 'ui_lefthanded_minimal.png' }); await E(() => __st.setUi('full'));
+  // plane HUD in the editor: flight HUD / throttle / rudder get handles when flying, drag persists
+  await E(() => __st.setCraft('plane', 'cub', 'runway')); await sleep(1200);
+  await p.keyboard.press('KeyU'); await sleep(400);
+  const ph = await E(() => ['pAtt', 'pThr', 'pRud'].map(id => { const h = document.querySelector(`.uih[data-id="${id}"]`); return h ? h.textContent.trim().slice(0, 20) : null; }));
+  ok('plane HUD elements have editor handles', ph.every(Boolean), ph);
+  const t0 = await rect('pThr'); await drag('pThr', -120, -40); await sleep(150); const t1 = await rect('pThr');
+  await p.screenshot({ path: SH + 'ui_edit_plane.png' });
+  await p.keyboard.press('KeyU'); await sleep(300);
+  const sv = await E(() => JSON.parse(localStorage.getItem('srui_layout')).el.pThr);
+  ok('plane throttle draggable + saved', Math.abs(t1.cx - t0.cx + 120) < 10 && Math.abs(t1.cy - t0.cy + 40) < 10 && sv && sv.x !== undefined, { t0: [t0.cx, t0.cy], t1: [t1.cx, t1.cy], sv });
+  await E(() => __st.setCraft('car')); await sleep(800);
+  ok('plane HUD hidden again in car', await E(() => getComputedStyle(document.getElementById('pAtt')).display === 'none' && getComputedStyle(document.getElementById('pThr')).display === 'none'));
   ok('no console errors', errs.length === 0, errs.slice(0, 5));
   const n = Object.values(res).filter(r => r.pass).length; console.log(`\n${n}/${Object.keys(res).length} passed`);
   await b.close(); process.exit(n === Object.keys(res).length ? 0 : 1);

@@ -272,9 +272,36 @@ export const PRESETS = {
     exhaustVol: 1, mufflerTone: 0.75, exhaust: 'dual', crossover: 0.2, runnerReso: 0.45,
     intakeVol: 0.7, mechVol: 0.45, induction: 'none', pops: 0.25, master: 1.13,
     car: { mass: 1550, gears: [3.13, 2.1, 1.56, 1.24, 1.03, 0.86, 0.73], final: 4.4, wheelR: 0.34 }
+  },
+  // aircraft (SineRally UI planes): direct-drive aero engines with open stacks, low rpm range; the turbine is a smooth
+  // many-cylinder whine with the turbo whistle standing in for the compressor
+  aeroFlat4: {
+    name: 'Aero Flat-4 (bush plane)', layout: 'boxer', cylinders: 4, stroke: 4,
+    cyl: [C({ shape: 'thump', tone: 72, runner: 60, rough: 0.28, misfire: 0.006 }), C({ shape: 'thump', tone: 68, runner: 150, rough: 0.28 }),
+          C({ shape: 'thump', tone: 75, runner: 70, rough: 0.28 }), C({ shape: 'thump', tone: 66, runner: 170, rough: 0.28 })],
+    displacement: 5.2, idleRpm: 650, redline: 2700, limiter: 'soft', inertia: 0.5,
+    exhaustVol: 1.25, mufflerTone: 0.38, exhaust: 'dual', crossover: 0.1, runnerReso: 0.6,
+    intakeVol: 0.35, mechVol: 0.55, induction: 'none', pops: 0.2, master: 0.85,
+    car: { mass: 560, gears: [1], final: 1, wheelR: 0.4 }
+  },
+  aeroFlat6: {
+    name: 'Aero Flat-6 (aerobatic)', layout: 'boxer', cylinders: 6, stroke: 4,
+    cyl: rep(6, i => C({ shape: 'bark', tone: 95 + (i % 3) * 5, runner: 55 + (i % 2) * 40, rough: 0.18 })),
+    displacement: 8.9, idleRpm: 750, redline: 2900, limiter: 'soft', inertia: 0.45,
+    exhaustVol: 1.3, mufflerTone: 0.5, exhaust: 'dual', crossover: 0.2, runnerReso: 0.55,
+    intakeVol: 0.5, mechVol: 0.45, induction: 'none', pops: 0.35, master: 0.85,
+    car: { mass: 820, gears: [1], final: 1, wheelR: 0.3 }
+  },
+  turbine: {
+    name: 'Jet turbine (whine)', layout: 'inline', cylinders: 16, stroke: 2,
+    cyl: rep(16, () => C({ shape: 'soft', tone: 420, runner: 20, rough: 0.02 })),
+    displacement: 2.0, idleRpm: 3000, redline: 9500, limiter: 'soft', inertia: 0.9,
+    exhaustVol: 0.7, mufflerTone: 0.95, exhaust: 'single', crossover: 0, runnerReso: 0.2,
+    intakeVol: 1.0, mechVol: 0.1, induction: 'turbo', inductionVol: 1.6, pops: 0, master: 0.7,
+    car: { mass: 4500, gears: [1], final: 1, wheelR: 0.33 }
   }
 };
 
-export const PRESET_ORDER = ['muscleV8', 'flatV8', 'inline6', 'boxer4', 'inline4', 'v12', 'dirtbike', 'twoStroke', 'rotary', 'vtwin', 'v10odd'];
+export const PRESET_ORDER = ['muscleV8', 'flatV8', 'inline6', 'boxer4', 'inline4', 'v12', 'dirtbike', 'twoStroke', 'rotary', 'vtwin', 'v10odd', 'aeroFlat4', 'aeroFlat6', 'turbine'];
 
 export function preset(key) { return deriveEngine(PRESETS[key] || PRESETS.muscleV8); }

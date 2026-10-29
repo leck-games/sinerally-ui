@@ -18,7 +18,7 @@ export const version = '1.1.0';
 export const presets = PRESET_ORDER.map((k) => ({ id: k, name: PRESETS[k].name }));
 export const defaultPreset = 'muscleV8';
 /** Suggested preset per host vehicle id (hosts may ignore). */
-export const vehiclePresets = { buggy: 'boxer4', truck: 'muscleV8', quad: 'dirtbike', hyper: 'v12', forester: 'inline6' };
+export const vehiclePresets = { buggy: 'boxer4', truck: 'muscleV8', quad: 'dirtbike', hyper: 'v12', forester: 'inline6', cub: 'aeroFlat4', stunt: 'aeroFlat6', jet: 'turbine' };
 
 /**
  * Optional (API v1 extension): describes the config that setConfig()/getConfig() speak, so a host can build an

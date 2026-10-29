@@ -290,6 +290,7 @@ export function sample(x, z, o = OUT) {
     if (w > bestW) { bestW = w; bestH = hb; }
   }
   if (bestW > 0) h = hn + (bestH - hn) * bestW;
+  if (AF.length) { AO.h = h; AO.road = rw; AO.rtype = rtype; AO.rd = rdmin; if (airMod(x, z, hn)) { h = AO.h; rw = AO.road; rtype = AO.rtype; rdmin = AO.rd; } }
   const edge = mx(A(x), A(z)) - WORLD; if (edge > 0) h += edge * 0.6; // world rim
   o.h = h; o.hn = hn; o.deck = deck; o.road = rw; o.rtype = rtype; o.dom = NAT.dom; o.riv = NAT.riv; o.rd = rdmin;
   return o;
@@ -366,3 +367,73 @@ export function trackSD(x, z) { // signed radial distance to nearest race-loop c
   const t = nearTrack(x, z), dx = x - t.cx, dz = z - t.cz;
   return Math.hypot(dx, dz) - trackR(t, Math.atan2(dz, dx));
 }
+
+// ---------------- airfields: deterministic flat sites near the spawn loop (planes) ----------------
+// Each airfield flattens the terrain to its runway elevation (cut/fill blend like road beds), marks the runway as
+// road (paved -> asphalt surface, strip -> dirt) and keeps a clear zone (no trees / rocks) around runway + approaches.
+export const AF = [];
+const AO = { h: 0, road: 0, rtype: 0, rd: 1e9 };
+function airMod(x, z, hn) {
+  let hit = false;
+  for (let i = 0; i < AF.length; i++) {
+    const a = AF[i], rx = x - a.x, rz = z - a.z; if (A(rx) > a.R || A(rz) > a.R) continue;
+    const s = rx * a.dx + rz * a.dz, t = rx * a.dz - rz * a.dx, as = A(s), at = A(t);
+    const dd = Math.hypot(mx(0, as - a.L - 30), mx(0, at - a.W - 16)), blend = mn(90, 14 + 1.4 * A(hn - a.h));
+    if (dd < blend) { const w = dd <= 0 ? 1 : sst(blend, 0, dd); AO.h += (a.h - AO.h) * w; hit = true; }
+    if (as < a.L && at < a.W) { AO.road = 1; AO.rtype = a.paved ? HWY : TRAIL; AO.rd = -mn(a.W - at, a.L - as); hit = true; }
+    else if (as < a.L + 170 && at < a.W + 55) { AO.road = mx(AO.road, 0.06); hit = true; }
+  }
+  return hit;
+}
+function afCost(cx, cz, a, L, W, full) {
+  const dx = S(a), dz = C(a); let lo = 1e9, hi = -1e9, sum = 0, n = 0;
+  const nj = full ? 1 : 0;
+  for (let i = -4; i <= 4; i++) for (let j = -nj; j <= nj; j++) {
+    const s = i / 4 * L, t = j * (W + 10), h = natural(cx + dx * s + dz * t, cz + dz * s - dx * t);
+    if (NAT.riv < W + 30) return 1e9; lo = mn(lo, h); hi = mx(hi, h); sum += h; n++;
+  }
+  const h0 = sum / n; if (lo < WATER + 4) return 1e9;
+  let obs = 0;
+  if (full) for (const sg of [-1, 1]) for (let k = 1; k <= 3; k++) { const s = sg * (L + k * 140); obs += mx(0, natural(cx + dx * s, cz + dz * s) - h0 - 6 - k * 12); }
+  return (hi - lo) + obs * 0.6;
+}
+function afRoadClear(cx, cz, a, L, W) {
+  const dx = S(a), dz = C(a), paths = pathsNear(cx, cz, L + 400);
+  for (const e of paths) for (let s = -L - 120; s <= L + 120; s += 20) {
+    const x = cx + dx * s, z = cz + dz * s; if (!pathDist(e, x, z)) continue;
+    if (PD.d < e.hw + W + 110) return false;
+  }
+  return true;
+}
+function siteAirfields() {
+  const t0 = nearTrack(0, 0), [sx, sz] = trackPoint(t0, 0);
+  const KIND = [
+    { id: 'main', name: 'SINE FIELD', L: 500, W: 20, paved: true },
+    { id: 'bush', name: 'BUSH STRIP', L: 230, W: 12, paved: false },
+    { id: 'ridge', name: 'RIDGE STRIP', L: 330, W: 15, paved: false }];
+  const H = 8, STEP = 230, N = 16;
+  for (const k of KIND) {
+    const cand = [];
+    for (let i = -N; i <= N; i++) for (let j = -N; j <= N; j++) {
+      const cx = sx + i * STEP + 37, cz = sz + j * STEP - 53, r = Math.hypot(cx - sx, cz - sz);
+      if (r < 380 || r > 3700) continue;
+      if (AF.some(o => Math.hypot(o.x - cx, o.z - cz) < o.L + k.L + 600)) continue;
+      const hc = natural(cx, cz); if (hc < WATER + 5 || NAT.riv < 60) continue;
+      for (let q = 0; q < H; q++) { const a = q * Math.PI / H, c = afCost(cx, cz, a, k.L, k.W, false); if (c < 40) cand.push([c + r * 0.0015, cx, cz, a]); }
+    }
+    cand.sort((p, q) => p[0] - q[0]);
+    let best = null;
+    for (const [, cx, cz, a] of cand.slice(0, 40)) {
+      const c = afCost(cx, cz, a, k.L, k.W, true) + Math.hypot(cx - sx, cz - sz) * 0.0015;
+      if (best && c >= best[0]) continue;
+      if (!afRoadClear(cx, cz, a, k.L, k.W)) continue;
+      best = [c, cx, cz, a];
+    }
+    if (!best) continue;
+    const [, cx, cz, a] = best, dx = S(a), dz = C(a); let sum = 0, n = 0;
+    for (let i = -6; i <= 6; i++) for (let j = -1; j <= 1; j++) { const s = i / 6 * k.L, t = j * k.W; sum += natural(cx + dx * s + dz * t, cz + dz * s - dx * t); n++; }
+    AF.push({ ...k, x: cx, z: cz, a, dx, dz, h: sum / n + 0.4, R: k.L + 320 });
+  }
+}
+siteAirfields();
+export function nearestAirfield(x, z) { let b = null, bd = 1e18; for (const a of AF) { const d = (a.x - x) ** 2 + (a.z - z) ** 2; if (d < bd) { bd = d; b = a; } } return b; }

@@ -12,7 +12,7 @@ const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
 const BASE_DRY = [0.86, 0.93, 0.22, 0.97, 0.82, 0.38];
 
 export { W as world, U as uniforms, SPECIES };
-export function createTerrain({ bus = null, small = false, grassCount, persistKey = null } = {}) {
+export function createTerrain({ bus = null, small = false, grassCount, persistKey = null, nearN, farN } = {}) {
   const listeners = new Map();
   const emit = (type, detail) => { (listeners.get(type) || []).forEach(f => { try { f(detail); } catch (e) { console.error(e); } }); if (bus) (bus.emit || bus.fire || (() => {})).call(bus, type, detail); };
   const on = (type, f) => { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(f); return () => off(type, f); };
@@ -62,7 +62,7 @@ export function createTerrain({ bus = null, small = false, grassCount, persistKe
   // ---- render ----
   let ground = null, scene = null, meshes = [];
   function setup(sc) {
-    scene = sc; ground = createGround(sc, { small, grassCount }); weather.baseFar = ground.farDist;
+    scene = sc; ground = createGround(sc, { small, grassCount, nearN, farN }); weather.baseFar = ground.farDist;
     meshes = [...ground.meshes, ...trees.setup(sc), ...fire.setup(sc), ...weather.setup(sc)];
     return meshes;
   }
@@ -96,6 +96,7 @@ export function createTerrain({ bus = null, small = false, grassCount, persistKe
     setWind: weather.setWind, wind: weather.wind, setRain: weather.setRain, setTimeOfDay: weather.setTimeOfDay, setLightning: weather.setLightning, strike: weather.strike,
     rainAt: weather.rainAt, coverageAt: weather.coverageAt, wetAt: weather.wetAt, snapWeather: weather.snapBias,
     setup, update, on, off, uniforms: U, FIRE_CELL,
+    setRoadDetail: (lvl, aniso) => ground ? ground.roads.setDetail(lvl, aniso) : 0, get roadStats() { return ground ? ground.roads.hdStats : null; }, get ground() { return ground; },
     stats: () => ({ trees: trees.stats(), fire: fire.stats(), weather: (({ mode, bias, tod, localRain, localCov, clouds, shafts, windSpeed }) => ({ mode, bias: +bias.toFixed(2), tod, localRain: +localRain.toFixed(2), localCov: +localCov.toFixed(2), clouds, shafts, windSpeed }))(weather.state) }),
     save: () => ({ trees: trees.save(), burnt: fire.save() }), load(s) { if (s) { trees.load(s.trees); fire.load(s.burnt); } },
     dispose() { unsub.forEach(f => f()); meshes.forEach(m => { scene && scene.remove(m); m.geometry && m.geometry.dispose(); m.material && m.material.dispose && m.material.dispose(); }); },

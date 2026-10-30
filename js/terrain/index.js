@@ -12,7 +12,7 @@ const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
 const BASE_DRY = [0.86, 0.93, 0.22, 0.97, 0.82, 0.38];
 
 export { W as world, U as uniforms, SPECIES };
-export function createTerrain({ bus = null, small = false, grassCount, persistKey = null, nearN, farN } = {}) {
+export function createTerrain({ bus = null, small = false, grassCount, persistKey = null, nearN, farN, treeNearR } = {}) {
   const listeners = new Map();
   const emit = (type, detail) => { (listeners.get(type) || []).forEach(f => { try { f(detail); } catch (e) { console.error(e); } }); if (bus) (bus.emit || bus.fire || (() => {})).call(bus, type, detail); };
   const on = (type, f) => { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(f); return () => off(type, f); };
@@ -45,7 +45,7 @@ export function createTerrain({ bus = null, small = false, grassCount, persistKe
     out.burning = f.burning; out.burnt = f.burnt; out.rain = weather.rainAt(x, z); out.weights = { grassland: o.bg, savanna: o.bs, forest: o.bf };
     return out;
   }
-  const trees = createTrees({ fuelAt, heightAt, emit });
+  const trees = createTrees({ fuelAt, heightAt, emit, ...(treeNearR != null ? { nearR: treeNearR } : {}) });
   const fire = createFire({ fuelAt, heightAt, rainAt: weather.rainAt, wetAt: weather.wetAt, wind: weather.wind, trees, emit });
   // ---- engine heat ignition + physics tree events ----
   function engineHot(d = {}) { const p = d.position || d; const k = Math.max(0, Math.min(1, d.intensity ?? 0.5)); if (Math.random() < k * 0.3) return fire.ignite(p.x, p.z, { radius: 1, cause: 'engine:hot' }); return 0; }

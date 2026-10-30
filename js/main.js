@@ -88,7 +88,8 @@ function dynRes(dt) { // every second: scale render resolution to hold the targe
 // It gets an emit-only bus (no on()), so the game routes physics events into it explicitly (fractional tree HP lives here).
 const grassMax = qName === 'Ultra' ? QUAL.Ultra.grass : QUAL.High.grass; // instance buffer size is fixed at load (Ultra density needs a reload from lower levels)
 const T = createTerrain({ bus: { emit: (t, d) => bus.emit(t, d) }, small: SMALL, grassCount: grassMax, persistKey: 'sinerally_terrain1',
-  farN: QUAL[qName].farN && !(isTouch && qName === 'High') ? QUAL[qName].farN : undefined, nearN: QUAL[qName].nearN });
+  farN: QUAL[qName].farN && !(isTouch && qName === 'High') ? QUAL[qName].farN : undefined, nearN: QUAL[qName].nearN,
+  treeNearR: new URLSearchParams(location.search).get('treelod') === 'mesh' ? undefined : 0 }); // trees: the comic impostor LOD at every distance (no high-poly near meshes); ?treelod=mesh = old near meshes
 const tMeshes = T.setup(scene) || [];
 const grassMesh = tMeshes.find(m => m && m.geometry && m.geometry.attributes && m.geometry.attributes.off) || null;
 const SO = { h: 0, hn: 0, deck: 0, road: 0, rtype: 0, dom: 0, riv: 0, rd: 0 }, nv = [0, 0, 0], cv = [0, 0, 0];

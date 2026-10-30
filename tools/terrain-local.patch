@@ -1,0 +1,45 @@
+diff --git a/js/terrain/index.js b/js/terrain/index.js
+index def7e3f..f3bf52d 100644
+--- a/js/terrain/index.js
++++ b/js/terrain/index.js
+@@ -12,7 +12,7 @@ const sst = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
+ const BASE_DRY = [0.86, 0.93, 0.22, 0.97, 0.82, 0.38];
+ 
+ export { W as world, U as uniforms, SPECIES };
+-export function createTerrain({ bus = null, small = false, grassCount, persistKey = null, nearN, farN } = {}) {
++export function createTerrain({ bus = null, small = false, grassCount, persistKey = null, nearN, farN, treeNearR } = {}) {
+   const listeners = new Map();
+   const emit = (type, detail) => { (listeners.get(type) || []).forEach(f => { try { f(detail); } catch (e) { console.error(e); } }); if (bus) (bus.emit || bus.fire || (() => {})).call(bus, type, detail); };
+   const on = (type, f) => { if (!listeners.has(type)) listeners.set(type, []); listeners.get(type).push(f); return () => off(type, f); };
+@@ -45,7 +45,7 @@ export function createTerrain({ bus = null, small = false, grassCount, persistKe
+     out.burning = f.burning; out.burnt = f.burnt; out.rain = weather.rainAt(x, z); out.weights = { grassland: o.bg, savanna: o.bs, forest: o.bf };
+     return out;
+   }
+-  const trees = createTrees({ fuelAt, heightAt, emit });
++  const trees = createTrees({ fuelAt, heightAt, emit, ...(treeNearR != null ? { nearR: treeNearR } : {}) });
+   const fire = createFire({ fuelAt, heightAt, rainAt: weather.rainAt, wetAt: weather.wetAt, wind: weather.wind, trees, emit });
+   // ---- engine heat ignition + physics tree events ----
+   function engineHot(d = {}) { const p = d.position || d; const k = Math.max(0, Math.min(1, d.intensity ?? 0.5)); if (Math.random() < k * 0.3) return fire.ignite(p.x, p.z, { radius: 1, cause: 'engine:hot' }); return 0; }
+diff --git a/js/terrain/trees.js b/js/terrain/trees.js
+index b760c83..cbaa77f 100644
+--- a/js/terrain/trees.js
++++ b/js/terrain/trees.js
+@@ -110,6 +110,9 @@ const IMP_FS = COMIC + /* glsl */`
+     float isF = step(0.5, fo);
+     vec2 d = (p - cn) / rr; vec3 N = normalize(vR * d.x * 0.8 + vec3(0., 1., 0.) * (0.35 + d.y * 0.5) + normalize(cameraPosition - vW) * 0.6);
+     vec3 al = isF > 0.5 ? vC : vec3(.42,.3,.2);
++    float dm = 1. - vHP; // damage: ink cracks + pale splinters on the trunk (same look as the old near mesh)
++    if (dm > 0.01 && isF < 0.5) { float zz = abs(fract(p.y * 14. + 3. * p.x) - 0.5); float cr = abs(sin(p.x * 60. + p.y * 9. + 4. * zz));
++      float on = step(p.y, 0.12 + 0.45 * dm); al = mix(al, vec3(.86,.72,.48), step(cr, 0.3 + 0.15 * dm) * on * 0.8); al = mix(al, vec3(.04,.03,.03), step(cr, 0.12 + 0.1 * dm) * on); }
+     if (sp > 4.5) al = vec3(.11,.09,.08);
+     al = mix(al, al * vec3(1.25, 1.0, 0.45), (1. - vHP) * 0.7 * isF);
+     al = mix(al, vec3(.09,.07,.06), smoothstep(0.05, 0.9, vBurn));
+@@ -204,7 +207,7 @@ export function createTrees({ fuelAt, heightAt, emit = () => {}, nearR = 110, fa
+   }
+   // ---------- rendering ----------
+   let near = [], imp = null, lastBuild = { x: 1e9, z: 1e9, dx: 0, dz: 0, t: -1 }, nearCount = 0, impCount = 0, pending = false, time = 0;
+-  const NMAX = [1800, 1800, 500, 1100, 300, 700], IMAX = 9000;
++  const NMAX = [1800, 1800, 500, 1100, 300, 700], IMAX = 14000;
+   function attrs(g, max, withSp) {
+     const a = { iPos: new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4), iPar: new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4), iCol: new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3) };
+     if (withSp) a.iSp = new THREE.InstancedBufferAttribute(new Float32Array(max), 1);

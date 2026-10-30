@@ -2,6 +2,13 @@
 Fork of the finished [Sine Rally](https://github.com/leck-games/sinerally) (frozen at b93c3b6) plus a HUD layout editor.
 Live: **https://leck-games.github.io/sinerally-ui/** (installs as its own home-screen app "Sine Rally UI").
 
+## Trees: one comic LOD at every distance (2026-10-30)
+Trees now use the cel-shaded impostor cards (2 triangles per tree) at every distance; the high-poly near meshes are gone. The look matches
+near and far, and the GPU saves about 138k triangles in a forest (Med: 289k → 151k, High: 320k → 183k; spawn about 150k / 180k). HP, damage
+lean and tint, trunk cracks, fire/char, harvesting, collisions and labels are unchanged (they come from tree data, not the meshes).
+`?treelod=mesh` brings back the old near meshes for comparison. The vendored terrain change is in `tools/terrain-local.patch`, which `tools/sync-terrain.sh` re-applies.
+Shots: `shots/trees_lod_{before,after}_{close,distant}.png`, `shots/trees_lod_before_after.png`.
+
 ## UI redesign (2026-10-29) — less clutter, touch-first
 - **Corner group (top right):** ☰ opens the menu, ⚙ opens the **quick tray** (RESET/RUNWAY · GRAPHICS · HANDLING · HUD mode ·
   TILT · FPS · SOUND · MAP). The tray closes on any tap outside it or after 8 s, and opens towards the screen centre wherever you move the corner.

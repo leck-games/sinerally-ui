@@ -39,11 +39,12 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   // tree with HP: buggy into a tree at speed
   tgt = await aim('buggy', 14); await sleep(800); const n2 = await E(() => __ev.length);
   await E(() => { const v = __st.veh, s = 120 / 3.6; v.v.x = v.fwd.x * s; v.v.z = v.fwd.z * s; for (const w of v.wheels) w.omega = s / v.P.wheelR; v.gear = 4; });
-  await p.keyboard.down('ArrowUp'); for (let i = 0; i < 20; i++) { await sleep(150); if (await E(n => __ev.slice(n).includes('tree:damage'), n2)) break; } await p.keyboard.up('ArrowUp'); await sleep(200);
+  await p.keyboard.down('ArrowUp'); for (let i = 0; i < 20; i++) { await sleep(150); if (await E(n => __ev.slice(n).includes('tree:damage'), n2)) break; } await p.keyboard.up('ArrowUp'); await sleep(300);
+  const labHit = await E(() => [...document.querySelectorAll('#labels .hp')].filter(d => d.style.display !== 'none').map(d => d.lastChild.textContent)); // damaged label while the tree is still in view
   await p.keyboard.down('ArrowDown'); await sleep(1800); await p.keyboard.up('ArrowDown'); await sleep(1200);
   await p.screenshot({ path: SH + 'merge_treehp.png' });
   const th = await E((id, n) => ({ ev: [...new Set(__ev.slice(n))], hp: __st.hpMap.get(id), damaged: [...__st.hpMap.values()].map(v => +v.toFixed(2)), terr: __st.T.getTree(id) ? __st.T.getTree(id).hp : 'removed', labels: [...document.querySelectorAll('#labels .hp')].filter(d => d.style.display !== 'none').map(d => d.lastChild.textContent) }), tgt.id, n2);
-  ok('tree HP', th.ev.includes('tree:damage') && th.labels.some(l => !l.startsWith('3.0')), { tgt, ...th, labels: th.labels.slice(0, 3) });
+  ok('tree HP', th.ev.includes('tree:damage') && th.labels.concat(labHit).some(l => !l.startsWith('3.0')), { tgt, ...th, labHit, labels: th.labels.slice(0, 3) });
   // overheat ignites grass: savanna/grassland, force heat high and rev
   await E(() => { __st.setVehicle('buggy'); const bp = __st.toBiome('savanna') || __st.toBiome('grassland'); __st.T.extinguishAll(); __st.veh.heat.temp = 112; });
   await sleep(500); const n3 = await E(() => __ev.length);

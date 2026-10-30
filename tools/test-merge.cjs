@@ -14,8 +14,8 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   const x0 = await E(() => [__st.x, __st.z]); await p.keyboard.down('ArrowUp'); await sleep(4000); await p.keyboard.up('ArrowUp');
   const x1 = await E(() => [__st.x, __st.z, Math.round(__st.TEL.speed * 3.6), __st.veh.gear]); ok('driving', Math.hypot(x1[0] - x0[0], x1[1] - x0[1]) > 3, { moved: +Math.hypot(x1[0] - x0[0], x1[1] - x0[1]).toFixed(1), kmh: x1[2], gear: x1[3] });
   // selector
-  await p.click('#tSnd'); await sleep(300);
-  await p.click('#tMenu'); await sleep(800);
+  await p.click('#tQuick'); await sleep(300); await p.click('#tSnd'); await sleep(300);
+  await p.click('#tMenu'); await sleep(800); await p.click('.mtab[data-tab="vehicle"]'); await sleep(400);
   const sel = await E(() => ({ btns: [...document.querySelectorAll('#mVeh .vlist button')].map(b => b.textContent.trim()), canvas: !!document.querySelector('#mVeh canvas') }));
   ok('selector', sel.btns.length >= 5 && sel.canvas, sel); await p.screenshot({ path: SH + 'merge_selector.png' });
   // pick forester through the selector UI
@@ -63,7 +63,7 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   await E(() => __st.setWx('clear'));
   // sound editor (back at the start, on the track)
   await E(x => __st.teleport(x[0], x[1], 0), x0); await sleep(1500);
-  await p.click('#tMenu'); await sleep(600);
+  await p.click('#tMenu'); await sleep(600); await p.click('.mtab[data-tab="sound"]'); await sleep(400);
   const hasEd = await E(() => !!document.getElementById('sndEdit')); 
   if (hasEd) { await p.click('#sndEdit'); await sleep(600); }
   const c0 = await E(() => __st.editor.open && JSON.parse(JSON.stringify(__st.audio.instance.getConfig())));

@@ -2,15 +2,27 @@
 Fork of the finished [Sine Rally](https://github.com/leck-games/sinerally) (frozen at b93c3b6) plus a HUD layout editor.
 Live: **https://leck-games.github.io/sinerally-ui/** (installs as its own home-screen app "Sine Rally UI").
 
-## Layout editor (☰ → ✥ EDIT UI, or key U)
+## UI redesign (2026-10-29) — less clutter, touch-first
+- **Corner group (top right):** ☰ opens the menu, ⚙ opens the **quick tray** (RESET/RUNWAY · GRAPHICS · HANDLING · HUD mode ·
+  TILT · FPS · SOUND · MAP). The tray closes on any tap outside it or after 8 s, and opens towards the screen centre wherever you move the corner.
+- **Context-aware HUD:** the race bar only shows while racing or near the start gate (never in a plane), fuel-can counter only
+  once you carry cans, BOOST hides on planes without afterburner, the rudder sits in a column at the left edge.
+- **Tabbed menu** (full safe-area sheet, 40 px+ tabs, every pane scrolls): DRIVE/FLY · VEHICLE · SOUND · GRAPHICS ·
+  CONTROLS & HUD (HUD mode, tilt, plane pitch, ✥ EDIT HUD LAYOUT) · WORLD (time, weather, map, garage). Esc closes it.
+- **Design tokens** in `index.html :root` (`--ink --paper --y --o --g --r --b`, `--fs-*`, `--tap`, `--gap`, safe-area `--sl/--sr/--st/--sb`).
+- Test: `node tools/test-redesign.cjs` (844×390: no HUD overlap car/plane incl. worst case, tray, every tab reachable +
+  scrolls, engine editor parity, live preview, per-vehicle persistence car+plane, layout v1→v2 migration, no console errors).
+
+## Layout editor (☰ → CONTROLS & HUD → ✥ EDIT HUD LAYOUT, or key U)
 - Opening the editor **pauses the game**. Every HUD element gets a dashed handle: **drag** to move (touch or mouse),
   **pinch** (two fingers, selected element) or **− / +** or mouse wheel to resize (0.5–2.5×). Arrow keys nudge (Shift = 8 px).
-- Per element: opacity slider, HIDE/SHOW, DEFAULT POS. Top-bar buttons (☰, RESET, GFX, Tilt, FPS, sound) can be hidden
-  and faded individually; they move together as TOP BAR. ☰ and UI MODE can't be hidden (so you can't lock yourself out).
+- Per element: opacity slider, HIDE/SHOW, DEFAULT POS. The ☰ ⚙ corner group can be moved/scaled/faded but not hidden
+  (so you can't lock yourself out).
 - SNAP: 8 px grid inside the safe area + snapping to safe-area edges and the screen centre. ALL: global opacity + scale.
 - PRESET: DEFAULT, LEFT-HANDED (mirrored), CLEAN (minimal look) · ⇋ MIRROR (swap sides of the current layout) · ⟲ RESET.
 - SLOTS 1–3: save/load your own layouts. JSON EXPORT (copies to clipboard) / IMPORT (paste) to share layouts.
-- Stored in `localStorage.srui_layout` (versioned, `v:1`); positions are offsets from viewport anchors
+- Stored in `localStorage.srui_layout` (versioned, `v:2`; v1 layouts from before the redesign are migrated: the old
+  TOP BAR / UI MODE / ARC entries are dropped, everything else is kept); positions are offsets from viewport anchors
   (left/centre/right × top/middle/bottom of the safe area) so layouts survive rotation and other screen sizes.
 - Works with UI modes FULL / MINIMAL / NONE (I key / UI MODE button): your hidden flags are respected in every mode.
 - Test: `python3 -m http.server 18941 --bind 127.0.0.1` then `node tools/test-ui.cjs` (iPhone 12 landscape, synthetic touch).
@@ -40,7 +52,7 @@ In the plane menu: RESET TO RUNWAY, AIR START, ✈ <airfield> to teleport to a f
 | Wheel brake | Space | BRAKE |
 | Afterburner (jet) | Shift | BURN |
 
-## Graphics quality (☰ GFX button / menu) — LOW · MED · HIGH · ULTRA
+## Graphics quality (⚙ → GRAPHICS, or ☰ → GRAPHICS) — LOW · MED · HIGH · ULTRA
 MED is the phone default. The choice is stored in `localStorage.sinerally_q3`; URL override `?q=low|med|high|ultra`
 (`&dyn=0` turns off the dynamic-resolution fallback).
 
@@ -77,9 +89,9 @@ Run: `python3 -m http.server 8000 --bind 0.0.0.0` in this folder, open http://lo
   The surface mask, markings, bridges, minimap and world map all use the same widths.
 - **Handling: ARCADE (default) vs NORMAL** (NORMAL is the former SIM model). ARCADE has NFS-Carbon/Trackmania-style
   assisted grip, easy drift entry with a held drift angle, counter-steer assist and drift → nitro. Each car keeps its own
-  feel. Switch it while driving: the HUD **ARC/NRM** button (top right), ☰ → HANDLING, or key **H**. The choice is saved
+  feel. Switch it while driving: ⚙ quick tray → HANDLING, ☰ → DRIVE, or key **H**. The choice is saved
   (`sinerally_handling`, `?handling=normal`). Touch steering has its own curve for each mode.
-- **UI modes**: the ◉/◐/○ corner button or key **I** cycles **FULL → MINIMAL** (driving essentials, small minimap, ARC
+- **UI modes**: ⚙ quick tray → HUD, ☰ → CONTROLS & HUD, or key **I** cycles **FULL → MINIMAL** (driving essentials, small minimap, ARC
   button) **→ NONE** (everything hidden; the touch zones still work invisibly; a faint button brings the UI back). The
   mode is saved (`sinerally_ui`). Controls that don't apply hide themselves: UNLOAD n appears only with logs on board,
   and the temperature bar only when the engine is warm. Everything respects safe-area insets.
@@ -105,10 +117,18 @@ The two standalone modules are now part of the game, vendored unchanged with the
   so sound plugins can hear `tree:damage`, `tree:destroyed`, `engine:hot`, `engine:overheat`, `harvester:*`, `crash`, `land`… .
 - Kept: sound plugin host, world map, vistas/landmarks, fuel cans, day/night, comic post pass on all GFX levels, iOS
   home-screen metas, launcher link. Removed (replaced by the modules): `js/vehicle.js`, `js/grass.js`, `js/roads.js`.
-- **Engine sound editor:** ☰ → ENGINE SOUND → **EDIT** opens a compact panel (collapsed sections) with the Engine Sim
-  controls – layout (inline/V/boxer/**rotary 1–16 rotors**), firing order + firing-lights strip, per-cylinder tweaks,
-  intake/exhaust/mix. Auto-saved per vehicle; named save/load; JSON export/import; RESET returns to the preset. Car
-  input is paused while it is open. Only shown if the active plugin has `setConfig/getConfig` (PLUGIN_API.md §1a).
+- **Engine editor** (parity with the [Engine Sim demo](https://leck-games.github.io/sinerally-enginesim/)): ☰ → SOUND →
+  **🎛 OPEN ENGINE EDITOR**. Demo engine diagram (vendored `viz.js`, tap a cylinder to edit it) + firing timeline; presets;
+  layout / cylinders / bank angle / crank / 4- or 2-stroke / firing order (+ DEFAULT ORDER, RECOMPUTE ANGLES, `#n@angle°`
+  readout with intervals); per cylinder vol, tone, shape, runner, misfire, rough, fire slot, angle + position (custom layout),
+  APPLY TO ALL, CLEAR MISFIRES; displacement, idle, redline, limiter, inertia, induction, pops; master, exhaust vol,
+  muffler, runner reso, single/dual exhaust, crossover, intake/mech/induction vol, light-sync offset; car mass + final
+  drive; JSON export (raw config — pastes straight into the demo) / import (demo or game JSON); RENDER 6 s WAV.
+  **PREVIEW: BENCH** (car paused, hold REV / NITRO) or **DRIVE** (the panel moves between the touch controls, edits are
+  live while you drive or fly; ▾ shrinks it to a 36 px firing-lights strip). Auto-saved per vehicle — every car and every
+  plane has its own config — in `localStorage.sinerally_sndcfg1`; RESET returns to the preset. Only shown if the active
+  plugin has `setConfig/getConfig` (PLUGIN_API.md §1a); other plugins and the fallback are unchanged (API v1).
+- `tools/sync-enginesim.sh` vendors plugin + `viz.js` from engine-sim and re-applies `tools/enginesim-local.patch` (plane presets).
 - Tests (serve on :18931): `node tools/test-merge.cjs` (merge e2e + `shots/merge_*.png`), `node tools/test-terrain.cjs`
   (terrain e2e adapted to the game), `node tools/test-sound.cjs`; physics unit tests live in sinerally-physics (`node tests/unit.mjs`).
 

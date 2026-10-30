@@ -28,7 +28,7 @@ let fail = false; const check = (ok, what, extra = '') => { console.log((ok ? 'O
   await until(p, () => window.__st.audio.active === 'enginesim'); await sleep(2500);
   let s = await S(p); check(s.active === 'enginesim' && s.ctx === 'running' && s.updates > 5 && s.msgs > 10, 'default Engine Sim plugin loads, update() called, worklet running', JSON.stringify(s));
   check(s.preset === 'boxer4', 'buggy defaults to its vehicle sound preset (boxer4)', s.preset);
-  await p.click('#tMenu'); await sleep(400);
+  await p.click('#tMenu'); await sleep(400); await p.click('.mtab[data-tab="sound"]'); await sleep(300);
   await p.screenshot({ path: path.join(shots, 'sound_menu.png') });
   await p.select('#sndPreset', 'flatV8'); await sleep(500);
   await p.evaluate(() => { const s = document.getElementById('sndPreset'); s.size = Math.min(11, s.options.length); s.style.height = 'auto'; }); // expand list for the screenshot
@@ -40,9 +40,9 @@ let fail = false; const check = (ok, what, extra = '') => { console.log((ok ? 'O
   s = await S(p); check(s.preset === 'flatV8', 'buggy remembers the user-chosen preset', s.preset);
   // volume + mute
   await p.evaluate(() => { const v = document.getElementById('sndVol'); v.value = 0.4; v.dispatchEvent(new Event('input')); });
-  await p.click('#tSnd'); await sleep(200);
+  await p.evaluate(() => document.getElementById('tSnd').click()); await sleep(200);
   check(await p.evaluate(() => window.__st.audio.muted && JSON.parse(localStorage.sinerally_snd1).volume === 0.4), 'mute + volume persisted');
-  await p.click('#tSnd');
+  await p.evaluate(() => document.getElementById('tSnd').click());
   // custom by URL
   await p.evaluate(() => window.__st.audio.buildMenu(document.getElementById('mSnd')));
   await p.click('#sndUrl', { clickCount: 3 }); await p.type('#sndUrl', base + 'plugins/example-simple-engine.js');
@@ -78,7 +78,7 @@ let fail = false; const check = (ok, what, extra = '') => { console.log((ok ? 'O
   // iPhone 12 landscape (emulated viewport only, Chrome engine – NOT real iOS Safari)
   p = await open({ width: 844, height: 390, deviceScaleFactor: 3, isMobile: true, hasTouch: true, isLandscape: true }, base);
   await p.touchscreen.tap(422, 250); await until(p, () => !!window.__st.audio.active); await sleep(800);
-  await p.evaluate(() => document.getElementById('tMenu').click()); await sleep(400);
+  await p.evaluate(() => { document.getElementById('tMenu').click(); document.querySelector('.mtab[data-tab="sound"]').click(); }); await sleep(400);
   await p.evaluate(() => document.getElementById('mSnd').scrollIntoView());
   await p.screenshot({ path: path.join(shots, 'sound_menu_iphone12.png') });
   s = await S(p); check(!!s.active && s.updates > 0, 'emulated iPhone 12 viewport: tap unlocks + plugin runs', JSON.stringify(s));

@@ -105,6 +105,8 @@ const HUD = ['spdgrp', 'race', 'mini', 'cans', 'wp', 'corner', 'dbg', 'gauge', '
   const x0 = await E(() => [__st.x, __st.z]); await p.keyboard.down('ArrowUp'); await sleep(1500); await p.keyboard.up('ArrowUp'); const x1 = await E(() => [__st.x, __st.z]);
   const dist = Math.hypot(x1[0] - x0[0], x1[1] - x0[1]);
   await p.screenshot({ path: SH + 'engine_editor_live.png' });
+  const lo = await E(() => { const r = document.getElementById('sndEd').getBoundingClientRect(); return ['joy', 'bGas', 'bBrk', 'bBst', 'bDrf', 'gauge'].filter(id => { const q = document.getElementById(id).getBoundingClientRect(); return q.width && Math.min(r.right, q.right) - Math.max(r.left, q.left) > 1 && Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top) > 1; }); });
+  ok('LIVE editor panel leaves the touch controls + gauge uncovered', !lo.length, lo);
   ok('LIVE preview: car drives with the editor open, engine follows the car', lv.live && !lv.bench && lv.test !== true && dist > 1, { ...lv, dist });
   const m0 = await E(() => __st.audio.instance.getConfig().master); await E(() => { const e = document.querySelector('#sndEd [data-k="master"]'); e.value = '0.7'; e.dispatchEvent(new Event('input', { bubbles: true })); }); await sleep(150);
   ok('slider change applies live while driving', await E(() => Math.abs(__st.audio.instance.getConfig().master - 0.7) < 1e-6), m0);

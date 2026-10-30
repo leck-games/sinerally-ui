@@ -33,7 +33,7 @@ const LEVELS = ['Low', 'Med', 'High', 'Ultra'];
     console.log(L, JSON.stringify({ at, ...info[L] }), JSON.stringify(perf[L]));
   }
   const I = info;
-  ok('quality label + level applied at load (?q=)', LEVELS.every(L => I[L].label === 'GFX: ' + L), LEVELS.map(L => I[L].label));
+  ok('quality label + level applied at load (?q=)', LEVELS.every(L => I[L].label.toUpperCase().startsWith(L.toUpperCase())), LEVELS.map(L => I[L].label));
   ok('pixel ratio rises with level (dpr 3: 1 / 1.5 / 2 / 3)', I.Low.pr === 1 && I.Med.pr === 1.5 && I.High.pr === 2 && I.Ultra.pr === 3, LEVELS.map(L => I[L].pr));
   ok('HD road textures: off at LOW/MED, level 1 at HIGH, level 2 at ULTRA', I.Low.road.level === 0 && I.Med.road.level === 0 && I.High.road.level === 1 && I.Ultra.road.level === 2, LEVELS.map(L => I[L].road));
   ok('terrain micro-detail only at HIGH/ULTRA', I.Low.det === 0 && I.Med.det === 0 && I.High.det > 0 && I.Ultra.det >= I.High.det, LEVELS.map(L => I[L].det));
@@ -42,7 +42,7 @@ const LEVELS = ['Low', 'Med', 'High', 'Ultra'];
   ok('draw distance (camera far) larger at HIGH/ULTRA', I.High.far > I.Med.far && I.Ultra.far > I.High.far, LEVELS.map(L => Math.round(I[L].far)));
   ok('triangles rise with level (more terrain / grass)', perf.Ultra.car.tris > perf.Med.car.tris && perf.High.car.tris > perf.Low.car.tris, LEVELS.map(L => perf[L].car.tris));
   const p = await page(BASE + '?dyn=0', 1); await sleep(4000);
-  const cyc = []; for (let i = 0; i < 4 && (await p.evaluate(() => __st.q)) !== 'Ultra'; i++) { await p.tap('#tQ'); await sleep(300); cyc.push(await p.evaluate(() => __st.q)); }
+  await p.tap('#tQuick'); await sleep(300); const cyc = []; for (let i = 0; i < 4 && (await p.evaluate(() => __st.q)) !== 'Ultra'; i++) { await p.tap('#tQ'); await sleep(300); cyc.push(await p.evaluate(() => __st.q)); }
   const saved = await p.evaluate(() => localStorage.getItem('sinerally_q3')); await p.reload({ waitUntil: 'load' }); await sleep(4000);
   const after = await p.evaluate(() => ({ q: __st.q, road: __st.rinfo.road, label: document.getElementById('tQ').textContent }));
   ok('GFX choice persists in localStorage across reload', saved === 'Ultra' && after.q === 'Ultra' && after.road.level === 2, { cyc, saved, after });

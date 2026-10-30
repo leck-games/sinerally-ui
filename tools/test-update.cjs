@@ -13,17 +13,17 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   const hook = () => E(() => { window.__ev = []; __st.bus.on('*', (d, t) => __ev.push([t, d])); });
   await hook();
   // ---- handling: ARCADE default, HUD toggle, persisted, ☰ row
-  let h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').textContent }));
+  let h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').childNodes[0].textContent }));
   ok('handling default ARCADE', h.mode === 'arcade' && h.phys === 'arcade' && h.btn === 'ARC', h);
-  await p.tap('#tHand'); await sleep(300);
-  h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').textContent, ls: localStorage.getItem('sinerally_handling') }));
+  await p.tap('#tQuick'); await sleep(300); await p.tap('#tHand'); await sleep(300);
+  h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').childNodes[0].textContent, ls: localStorage.getItem('sinerally_handling') }));
   await p.reload({ waitUntil: 'load' }); await sleep(3500);
-  const h2 = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').textContent }));
+  const h2 = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').childNodes[0].textContent }));
   ok('handling toggle NRM + persisted', h.phys === 'normal' && h.btn === 'NRM' && h.ls === 'normal' && h2.phys === 'normal' && h2.btn === 'NRM', { afterTap: h, afterReload: h2 });
   await E(() => __st.openMenu(true)); await sleep(500);
   const row = await E(() => { const r = [...document.querySelectorAll('#mRows .mrow')].find(r => /HANDLING/.test(r.textContent)); if (!r) return null; [...r.querySelectorAll('button')].find(b => b.textContent === 'ARCADE').click(); return [...r.querySelectorAll('button')].map(b => b.textContent); });
   await E(() => __st.openMenu(false)); await sleep(200);
-  h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').textContent }));
+  h = await E(() => ({ mode: __st.handling, phys: __st.veh.mode, btn: document.getElementById('tHand').childNodes[0].textContent }));
   ok('handling ☰ row', row && row.join() === 'ARCADE,NORMAL' && h.phys === 'arcade' && h.btn === 'ARC', { row, ...h });
   // vehicle switch keeps the mode
   h = await E(() => { __st.setVehicle('truck'); const m = __st.veh.mode; __st.setVehicle('buggy'); return m; }); ok('mode kept across vehicle switch', h === 'arcade', h);
@@ -80,7 +80,7 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
     ok('auto-hide unload + temp', a.unl === 'none' && !a.temp && c.unl !== 'none' && c.temp && d.logs === 0 && d.unl === 'none', { cold: a, warmLogs: c, afterTap: d }); }
   // ---- touch layout: nitro bottom-left inside safe area, no overlaps
   { const L = await E(() => { const r = id => { const b = document.getElementById(id).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, show: getComputedStyle(document.getElementById(id)).display !== 'none' }; };
-      return Object.fromEntries(['bBst', 'joy', 'bGas', 'bBrk', 'bDrf', 'gauge', 'topbtns', 'tUi', 'tHand', 'mini'].map(k => [k, r(k)])); });
+      return Object.fromEntries(['bBst', 'joy', 'bGas', 'bBrk', 'bDrf', 'gauge', 'corner', 'mini'].map(k => [k, r(k)])); });
     const ov = (a, b) => !(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t); const ids = Object.keys(L); const bad = [];
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) if (L[ids[i]].show && L[ids[j]].show && ov(L[ids[i]], L[ids[j]])) bad.push(ids[i] + '/' + ids[j]);
     ok('nitro bottom-left, no overlaps', L.bBst.show && L.bBst.l >= 10 && L.bBst.r < L.joy.l && L.bBst.b > 330 && L.bBst.r < 120 && bad.length === 0, { bst: L.bBst, joy: L.joy, overlaps: bad });
@@ -98,17 +98,17 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
     const d = await E(n => { const ev = __ev.slice(n), e = ev.find(e => e[0] === 'drift:end'); return { start: ev.some(e => e[0] === 'drift:start'), end: e && e[1], nitroGain: +(__st.veh.nitro - __nit0).toFixed(3), roll: __st.veh.up.y > 0.5 }; }, n);
     ok('arcade drift in game', d.start && mx && d.roll, d); }
   await E(() => { __st.veh.v.x = __st.veh.v.z = 0; }); await sleep(1200);
-  const vis = () => E(() => Object.fromEntries(['hud', 'mini', 'topbtns', 'gauge', 'bGas', 'bBst', 'joy', 'tUi', 'tHand', 'cans', 'tSnd'].map(k => { const e = document.getElementById(k), c = getComputedStyle(e); let vis = c.display !== 'none' && c.opacity !== '0'; for (let q = e.parentElement; q && vis; q = q.parentElement) if (getComputedStyle(q).display === 'none') vis = false; return [k, vis ? +c.opacity : 0]; })));
+  const vis = () => E(() => Object.fromEntries(['hud', 'mini', 'corner', 'gauge', 'bGas', 'bBst', 'joy', 'cans'].map(k => { const e = document.getElementById(k), c = getComputedStyle(e); let vis = c.display !== 'none' && c.opacity !== '0'; for (let q = e.parentElement; q && vis; q = q.parentElement) if (getComputedStyle(q).display === 'none') vis = false; return [k, vis ? +c.opacity : 0]; })));
   await p.screenshot({ path: SH + 'upd_ui_full.png' }); const vF = await vis();
-  await p.tap('#tUi'); await sleep(2300); await p.screenshot({ path: SH + 'upd_ui_minimal.png' }); const vM = await vis();
-  await p.tap('#tUi'); await sleep(2300); await p.screenshot({ path: SH + 'upd_ui_none.png' }); const vN = await vis(); const uiLS = await E(() => localStorage.getItem('sinerally_ui'));
-  ok('UI FULL', vF.hud && vF.topbtns && vF.mini && vF.bGas && vF.bBst && vF.tUi && vF.tHand && vF.tSnd, vF);
-  ok('UI MINIMAL', vM.hud && vM.mini && vM.gauge && vM.bGas && vM.bBst && vM.joy && vM.tUi && !vM.topbtns && !vM.tSnd && !vM.cans, vM);
-  ok('UI NONE', !vN.hud && !vN.mini && !vN.gauge && !vN.topbtns && !vN.bGas && !vN.bBst && !vN.joy && vN.tUi > 0 && vN.tUi < 0.5 && uiLS === 'none', { ...vN, ls: uiLS });
+  await p.tap('#tQuick'); await sleep(300); await p.tap('#tUi'); await sleep(300); await p.tap('#tQuick'); await sleep(2000); await p.screenshot({ path: SH + 'upd_ui_minimal.png' }); const vM = await vis();
+  await p.tap('#tQuick'); await sleep(300); await p.tap('#tUi'); await sleep(300); await p.tap('#tQuick'); await sleep(2000); await p.screenshot({ path: SH + 'upd_ui_none.png' }); const vN = await vis(); const uiLS = await E(() => localStorage.getItem('sinerally_ui'));
+  ok('UI FULL', vF.hud && vF.corner && vF.mini && vF.bGas && vF.bBst, vF);
+  ok('UI MINIMAL', vM.hud && vM.mini && vM.gauge && vM.bGas && vM.bBst && vM.joy && vM.corner && !vM.cans, vM);
+  ok('UI NONE', !vN.hud && !vN.mini && !vN.gauge && !vN.bGas && !vN.bBst && !vN.joy && vN.corner > 0 && vN.corner < 0.5 && uiLS === 'none', { ...vN, ls: uiLS });
   { const g = await E(() => { const b = document.getElementById('bGas').getBoundingClientRect(); return [(b.left + b.right) / 2, (b.top + b.bottom) / 2]; });
     await p.touchscreen.touchStart(g[0], g[1]); await sleep(250); const gas = await E(() => __st.inp.gas); await p.touchscreen.touchEnd(); ok('NONE: invisible gas zone still works', gas === 1, { gas }); }
   await p.reload({ waitUntil: 'load' }); await sleep(3000); const pr = await E(() => ({ ui: __st.ui, cls: document.body.className }));
-  await p.tap('#tUi'); await sleep(200); const back = await E(() => __st.ui);
+  await p.tap('#tQuick'); await sleep(300); await p.tap('#tUi'); await sleep(200); const back = await E(() => __st.ui);
   ok('UI mode persisted + cycles back to FULL', pr.ui === 'none' && /ui-none/.test(pr.cls) && back === 'full', { ...pr, afterTap: back });
   ok('no console errors', errs.length === 0, errs.slice(0, 10));
   require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'sinerally-update-e2e.json'), JSON.stringify(res, null, 1));

@@ -21,13 +21,13 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   await p.goto(URL, { waitUntil: 'load' }); await E(() => localStorage.clear()); await p.reload({ waitUntil: 'load' }); await sleep(4500);
   const title = await p.title(); const man = await E(() => fetch('manifest.webmanifest').then(r => r.json()));
   ok('title + manifest', title === 'Sine Rally UI' && man.name === 'Sine Rally UI' && /sinerally-ui/.test(man.start_url), { title, name: man.name, start_url: man.start_url });
-  const def = {}; for (const id of ['joy', 'bGas', 'bBst', 'bDrf', 'bBrk', 'mini', 'spdgrp', 'topbtns', 'gauge', 'tUi', 'tHand']) def[id] = await rect(id);
+  const def = {}; for (const id of ['joy', 'bGas', 'bBst', 'bDrf', 'bBrk', 'mini', 'spdgrp', 'corner', 'gauge']) def[id] = await rect(id);
   let mv0 = await moved(1500); if (mv0 <= 1) { await sleep(3000); mv0 = await moved(1500); } ok('gameplay runs before edit', mv0 > 1, mv0); // retry once: cold swiftshader start can be slow
   // ---- open via ☰ → EDIT UI (touch taps)
-  await tapSel('#tMenu'); await sleep(400); const hasRow = await E(() => !!document.getElementById('mEditUi'));
+  await tapSel('#tMenu'); await sleep(400); await tapSel('.mtab[data-tab="hud"]'); await sleep(300); const hasRow = await E(() => !!document.getElementById('mEditUi'));
   await tapSel('#mEditUi'); await sleep(400);
-  const st = await E(() => ({ open: __st.uied.open, menu: document.getElementById('menu').style.display, handles: document.querySelectorAll('.uih').length, paused: __st.TEL.paused }));
-  ok('☰ EDIT UI opens editor (menu closed, handles)', hasRow && st.open && st.menu === 'none' && st.handles >= 20, st);
+  const st = await E(() => ({ open: __st.uied.open, menu: getComputedStyle(document.getElementById('menu')).display, handles: document.querySelectorAll('.uih').length, paused: __st.TEL.paused }));
+  ok('☰ → CONTROLS & HUD → EDIT HUD LAYOUT opens editor (menu closed, handles)', hasRow && st.open && st.menu === 'none' && st.handles >= 15, st);
   ok('game paused in edit mode', (await moved(1000)) < 0.01);
   await p.screenshot({ path: SH + 'ui_edit_handles.png' });
   // ---- drag joystick by touch: +240,-40 -> snapped to the 8 px grid
@@ -49,9 +49,9 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   // ---- per-element opacity + hide (ARC/NRM), global opacity/scale
   await E(() => { const s = document.querySelector('#uiedP [data-o]'); s.value = 0.5; s.dispatchEvent(new Event('input', { bubbles: true })); });
   ok('per-element opacity', (await E(() => getComputedStyle(document.getElementById('bGas')).opacity)) === '0.5');
-  await tapSel('#uiedP .ue-chip[data-sel="tHand"]'); await tapSel('#uiedP [data-a="hide"]');
-  const hid = await E(() => ({ e: __st.uied.layout.el.tHand, editVis: getComputedStyle(document.getElementById('tHand')).display }));
-  await tapSel('#uiedP .ue-chip[data-sel="tUi"]'); const essNoHide = await E(() => !document.querySelector('#uiedP [data-a="hide"]'));
+  await tapSel('#uiedP .ue-chip[data-sel="bDrf"]'); await tapSel('#uiedP [data-a="hide"]');
+  const hid = await E(() => ({ e: __st.uied.layout.el.bDrf, editVis: getComputedStyle(document.getElementById('bDrf')).display }));
+  await tapSel('#uiedP .ue-chip[data-sel="corner"]'); const essNoHide = await E(() => !document.querySelector('#uiedP [data-a="hide"]'));
   ok('hide toggle (ghosted while editing) + UI MODE not hideable', hid.e.h === 1 && hid.editVis !== 'none' && essNoHide, hid);
   await E(() => { const s = document.querySelector('#uiedP [data-g="o"]'); s.value = 0.8; s.dispatchEvent(new Event('input', { bubbles: true })); const t = document.querySelector('#uiedP [data-g="s"]'); t.value = 1.1; t.dispatchEvent(new Event('input', { bubbles: true })); });
   const gl = await E(() => ({ g: __st.uied.layout.g, op: getComputedStyle(document.getElementById('mini')).opacity, sc: getComputedStyle(document.getElementById('mini')).scale }));
@@ -60,7 +60,7 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   await p.screenshot({ path: SH + 'ui_edit_custom.png' });
   // ---- Done -> game resumes with the custom layout
   await tapSel('#uiedP [data-a="done"]'); await sleep(300);
-  const play = await E(() => ({ open: __st.uied.open, tHand: getComputedStyle(document.getElementById('tHand')).display, handles: getComputedStyle(document.getElementById('uiedL')).display }));
+  const play = await E(() => ({ open: __st.uied.open, tHand: getComputedStyle(document.getElementById('bDrf')).display, handles: getComputedStyle(document.getElementById('uiedL')).display }));
   ok('DONE closes, hidden element hidden in play', !play.open && play.tHand === 'none' && play.handles === 'none', play);
   ok('gameplay resumes after edit', (await moved(1500)) > 1);
   // joystick works at its new place (synthetic touch at knob centre + 40 px right -> steer right)
@@ -71,11 +71,11 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   // ---- persistence after reload
   const before = await E(() => __st.uied.exportJson());
   await p.reload({ waitUntil: 'load' }); await sleep(4000);
-  const after = await E(() => __st.uied.exportJson()), j2 = await rect('joy'), th = await E(() => getComputedStyle(document.getElementById('tHand')).display);
+  const after = await E(() => __st.uied.exportJson()), j2 = await rect('joy'), th = await E(() => getComputedStyle(document.getElementById('bDrf')).display);
   ok('layout persists after reload', before === after && Math.abs(j2.cx - j1.cx) < 1 && Math.abs(j2.cy - j1.cy) < 1 && th === 'none', { j1: [j1.cx, j1.cy], j2: [j2.cx, j2.cy], th });
-  ok('stored versioned', await E(() => JSON.parse(localStorage.getItem('srui_layout')).v === 1));
+  ok('stored versioned', await E(() => JSON.parse(localStorage.getItem('srui_layout')).v === 2));
   // ---- UI modes respect custom hidden flags + positions
-  const modes = {}; for (const m of ['minimal', 'none', 'full']) { await E(m => __st.setUi(m), m); await sleep(200); modes[m] = await E(() => ({ tHand: getComputedStyle(document.getElementById('tHand')).display, joyOp: getComputedStyle(document.getElementById('joy')).opacity, joyL: document.getElementById('joy').getBoundingClientRect().left, mini: getComputedStyle(document.getElementById('mini')).display })); }
+  const modes = {}; for (const m of ['minimal', 'none', 'full']) { await E(m => __st.setUi(m), m); await sleep(200); modes[m] = await E(() => ({ tHand: getComputedStyle(document.getElementById('bDrf')).display, joyOp: getComputedStyle(document.getElementById('joy')).opacity, joyL: document.getElementById('joy').getBoundingClientRect().left, mini: getComputedStyle(document.getElementById('mini')).display })); }
   ok('FULL/MINIMAL/NONE keep custom flags', modes.minimal.tHand === 'none' && modes.none.tHand === 'none' && modes.full.tHand === 'none' && modes.none.joyOp === '0' && modes.none.mini === 'none' && Math.abs(modes.minimal.joyL - j2.l) < 1 && Math.abs(modes.full.joyL - j2.l) < 1, modes);
   // ---- orientation / size change: anchored offsets kept
   const Lj = await E(() => __st.uied.layout.el.joy); await p.setViewport({ width: 667, height: 375, isMobile: true, hasTouch: true }); await sleep(600);
@@ -85,7 +85,7 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   // ---- key U opens, export/import, slots, mirror, presets, reset
   await p.keyboard.press('KeyU'); await sleep(300); ok('U key opens editor', await E(() => __st.uied.open));
   await tapSel('#uiedP [data-a="export"]'); const exp1 = await E(() => document.getElementById('ueJson').value);
-  ok('export JSON', (() => { try { const j = JSON.parse(exp1); return j.v === 1 && j.el.joy && j.el.joy.x; } catch (e) { return false; } })(), exp1.length);
+  ok('export JSON', (() => { try { const j = JSON.parse(exp1); return j.v === 2 && j.el.joy && j.el.joy.x; } catch (e) { return false; } })(), exp1.length);
   await tapSel('#uiedP [data-save="1"]'); await tapSel('#uiedP [data-a="reset"]');
   const rs = await E(() => ({ n: Object.keys(__st.uied.layout.el).length, joyStyle: document.getElementById('joy').style.left }));
   const jd = await rect('joy');
@@ -96,12 +96,12 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   await E(() => { document.getElementById('ueJson').value = '{"v":99,"el":{}}'; }); await tapSel('#uiedP [data-a="import"]');
   const bad = await E(() => document.getElementById('ueMsg').textContent); ok('bad import rejected', /failed/.test(bad) && (await E(() => __st.uied.exportJson())) === exp1, bad);
   await tapSel('#uiedP [data-a="reset"]');
-  await tapSel('#uiedP [data-a="mirror"]'); const mr = {}; for (const id of ['joy', 'bGas', 'bBst', 'mini', 'spdgrp', 'topbtns']) mr[id] = await rect(id);
+  await tapSel('#uiedP [data-a="mirror"]'); const mr = {}; for (const id of ['joy', 'bGas', 'bBst', 'mini', 'spdgrp', 'corner']) mr[id] = await rect(id);
   const mirOk = Object.entries(mr).every(([id, r]) => Math.abs((844 - r.cx) - def[id].cx) < 2 && Math.abs(r.cy - def[id].cy) < 2);
   ok('mirror swaps sides', mirOk && mr.bGas.cx < 422 && mr.joy.cx > 422 && mr.bBst.cx > 422, Object.fromEntries(Object.entries(mr).map(([k, r]) => [k, [Math.round(r.cx), Math.round(def[k].cx)]])));
   await tapSel('#uiedP [data-a="mirror"]'); const back = await rect('bGas'); ok('mirror twice = original', Math.abs(back.cx - def.bGas.cx) < 2 && Math.abs(back.cy - def.bGas.cy) < 2);
   await tapSel('#uiedP [data-p="clean"]'); const cl = await E(() => __st.uied.layout);
-  ok('CLEAN preset', cl.el.tReset.h === 1 && cl.el.cans.h === 1 && cl.g.o === 0.9);
+  ok('CLEAN preset', cl.el.dbg.h === 1 && cl.el.cans.h === 1 && cl.g.o === 0.9);
   await tapSel('#uiedP [data-p="lefty"]'); const lr = { gas: await rect('bGas'), joy: await rect('joy'), bst: await rect('bBst') };
   ok('LEFT-HANDED preset', lr.gas.cx < 422 && lr.joy.cx > 422 && lr.bst.cx > 422 && (await E(() => __st.uied.layout.flip)), Object.fromEntries(Object.entries(lr).map(([k, r]) => [k, Math.round(r.cx)])));
   await p.screenshot({ path: SH + 'ui_lefthanded_edit.png' });

@@ -118,12 +118,12 @@ const AP_SRC = `(() => {
   await p.screenshot({ path: SH + 'plane_jet.png' });
   // ---- stunt plane: takeoff via the vehicle-selector Planes tab (UI path)
   await E(() => { __st.planeCtl = null; }); await p.keyboard.press('Escape').catch(() => {});
-  await E(() => document.getElementById('tMenu').click()); await sleep(400);
+  await E(() => { __st.openMenu(true); document.querySelector('.mtab[data-tab="vehicle"]').click(); }); await sleep(600);
   const tabs = await E(() => ({ car: !!document.getElementById('vt_car'), plane: !!document.getElementById('vt_plane') }));
   if (tabs.plane) await E(() => document.getElementById('vt_plane').click()); await sleep(800);
   const btns = await E(() => [...document.querySelectorAll('#menu button')].map(b => b.textContent).filter(t => /✈/.test(t)));
   await E(() => { const b = [...document.querySelectorAll('#menu button')].find(b => /STUNT/.test(b.textContent)); b && b.click(); }); await sleep(800);
-  await E(() => { const m = document.getElementById('menu'); if (m.style.display !== 'none') { const c = document.getElementById('mnClose'); c && c.click(); } }); await sleep(800);
+  await E(() => { const m = document.getElementById('menu'); if (getComputedStyle(m).display !== 'none') { const c = document.getElementById('mnClose'); c && c.click(); } }); await sleep(800);
   const st = await S(); await p.screenshot({ path: SH + 'plane_selector.png' });
   ok('vehicle selector: PLANES tab lists the planes, picking STUNT X spawns it', tabs.car && tabs.plane && btns.length >= 3 && st.id === 'stunt' && !st.cr, { tabs, btns, st });
   await E(() => __st.planeToRunway()); await sleep(1000);

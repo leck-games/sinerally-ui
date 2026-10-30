@@ -1,18 +1,18 @@
-// SineRally UI — touch HUD layout editor (☰ → EDIT UI, key U).
+// SineRally UI — touch HUD layout editor (☰ → CONTROLS → EDIT HUD LAYOUT, key U).
 // Every HUD element gets a handle: drag (touch/mouse) to move, pinch / +/- / wheel to resize (0.5–2.5×), per-element
 // opacity + hide, 8 px grid + safe-area edge snapping, global opacity/scale, mirror (left-handed), presets, 3 save slots,
 // JSON export/import. Positions are stored against viewport anchors (left/centre/right × top/middle/bottom, inside the
 // safe area) so a layout survives rotation and size changes. Elements that were never moved keep their CSS position.
-export const LAYOUT_VERSION = 1;
+export const LAYOUT_VERSION = 2; // v2 (redesign): the top bar + UI/ARC corner buttons became one ☰ ⚙ corner group; v1 layouts are migrated
 const KEY = 'srui_layout', SLOT = n => 'srui_slot_' + n;
 // [id, label, kind] kind: 'm' movable, 's' sub-button of the top bar (hide/opacity only); flags: e = essential (never hidden)
 export const ELEMENTS = [
   ['spdgrp', 'SPEEDO', 'm'], ['race', 'RACE', 'm'], ['mini', 'MINIMAP', 'm'], ['cans', 'FUEL', 'm'], ['wp', 'WAYPOINT', 'm'],
-  ['topbtns', 'TOP BAR', 'm'], ['tMenu', '☰ MENU', 's', 'e'], ['tReset', 'RESET', 's'], ['tQ', 'GFX', 's'], ['tTilt', 'TILT', 's'], ['tDbg', 'FPS', 's'], ['tSnd', 'SOUND', 's'],
+  ['corner', '☰ ⚙ MENU + QUICK', 'm', 'e'],
   ['dbg', 'DEBUG', 'm'], ['gauge', 'GAUGE+TEMP', 'm'], ['joy', 'JOYSTICK', 'm'], ['bBst', 'BOOST', 'm'], ['bDrf', 'DRIFT', 'm'],
-  ['bGas', 'GAS', 'm'], ['bBrk', 'BRAKE', 'm'], ['bUnl', 'UNLOAD', 'm'], ['tUi', 'UI MODE', 'm', 'e'], ['tHand', 'ARC/NRM', 'm'],
+  ['bGas', 'GAS', 'm'], ['bBrk', 'BRAKE', 'm'], ['bUnl', 'UNLOAD', 'm'],
   ['pAtt', '✈ FLIGHT HUD', 'm'], ['pThr', '✈ THROTTLE', 'm'], ['pRud', '✈ RUDDER', 'm']]; // plane HUD (shown in plane mode; always editable here)
-const META = Object.fromEntries(ELEMENTS.map(([id, label, kind, f]) => [id, { id, label, kind, ess: f === 'e', flex: id === 'topbtns' || /^(b(Gas|Brk|Bst|Drf)|pRud)$/.test(id) }]));
+const META = Object.fromEntries(ELEMENTS.map(([id, label, kind, f]) => [id, { id, label, kind, ess: f === 'e', flex: id === 'corner' || /^(b(Gas|Brk|Bst|Drf)|pRud)$/.test(id) }]));
 const NOTX = new Set(['gauge', 'wp', 'race']); // their CSS centres them with translateX(-50%): dropped once they are placed explicitly
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), r1 = v => Math.round(v * 100) / 100;
 const blank = () => ({ v: LAYOUT_VERSION, g: { o: 1, s: 1 }, snap: true, flip: false, el: {} });
@@ -20,14 +20,18 @@ export const PRESETS = {
   default: () => blank(),
   lefty: null, // computed: default layout mirrored (needs the live default positions)
   clean: () => ({ v: LAYOUT_VERSION, g: { o: 0.9, s: 1 }, snap: true, flip: false, el: {
-    tReset: { h: 1 }, tQ: { h: 1 }, tTilt: { h: 1 }, tDbg: { h: 1 }, tSnd: { h: 1 }, dbg: { h: 1 }, cans: { h: 1 }, tHand: { h: 1 },
-    mini: { s: 0.8, o: 0.85 }, gauge: { s: 0.85, o: 0.85 }, race: { o: 0.8 }, tUi: { o: 0.5 },
+    dbg: { h: 1 }, cans: { h: 1 }, wp: { o: 0.8 },
+    mini: { s: 0.8, o: 0.85 }, gauge: { s: 0.85, o: 0.85 }, race: { o: 0.8 }, corner: { o: 0.6 },
     joy: { o: 0.55 }, bGas: { o: 0.55 }, bBrk: { o: 0.55 }, bBst: { o: 0.55 }, bDrf: { o: 0.55 }, pThr: { o: 0.6 }, pRud: { o: 0.55 }, pAtt: { s: 0.9, o: 0.85 } } })
 };
-// sanitise anything that came from storage / import into a valid v1 layout (unknown ids and junk dropped, numbers clamped)
+// v1 → v2: element ids that no longer exist (topbtns + its sub-buttons, tUi, tHand) are dropped, everything else is kept as is
+const V1_GONE = ['topbtns', 'tMenu', 'tReset', 'tQ', 'tTilt', 'tDbg', 'tSnd', 'tUi', 'tHand'];
+export function migrate(raw) { if (raw && raw.v === 1) { const el = Object.assign({}, raw.el); for (const k of V1_GONE) delete el[k]; return Object.assign({}, raw, { v: 2, el }); } return raw; }
+// sanitise anything that came from storage / import into a valid layout (old versions migrated, unknown ids and junk dropped, numbers clamped)
 export function normalize(raw) {
   if (typeof raw === 'string') raw = JSON.parse(raw);
   if (!raw || typeof raw !== 'object') throw new Error('not a layout');
+  raw = migrate(raw);
   if (raw.v !== LAYOUT_VERSION) throw new Error('unsupported layout version ' + raw.v);
   const L = blank(), num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
   if (raw.g) { L.g.o = clamp(num(raw.g.o, 1), 0.1, 1); L.g.s = clamp(num(raw.g.s, 1), 0.5, 2); }
@@ -63,7 +67,6 @@ export function createUiEditor({ onOpenChange = () => { }, onUiRestore = () => {
     el.classList.toggle('uie-h', !!e.h && !m.ess);
     if (m.kind !== 'm') return;
     const S = scaleOf(id); el.style.scale = S === 1 ? '' : String(S); el.style.transformOrigin = S === 1 && !e.x ? '' : '50% 50%';
-    if (id === 'topbtns') el.style.flexDirection = L.flip ? 'row-reverse' : '';
     if (!e.x) { for (const k of ['position', 'left', 'top', 'right', 'bottom', 'margin']) el.style[k] = ''; if (NOTX.has(id)) el.style.transform = ''; return; }
     const W0 = el.offsetWidth || e.w0 || 40, H0 = el.offsetHeight || e.h0 || 30; if (el.offsetWidth) { e.w0 = W0; e.h0 = H0; }
     const A = anchors(), vw = W0 * S, vh = H0 * S;
@@ -91,7 +94,7 @@ export function createUiEditor({ onOpenChange = () => { }, onUiRestore = () => {
   const rectOf = id => node(id).getBoundingClientRect();
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(L)); } catch (e) { } }
   function setLayout(nl, save = true) { L = normalize(JSON.parse(JSON.stringify(nl))); applyAll(); if (save) persist(); if (open) render(); }
-  // mirror: every movable element's box flipped around the vertical centre line (anchors l<->r), top bar order reversed
+  // mirror: every movable element's box flipped around the vertical centre line (anchors l<->r); the ⚙ tray opens towards the screen centre on its own
   function mirror(save = true) {
     const boxes = {};
     for (const [id, , kind] of ELEMENTS) { if (kind !== 'm') continue; const e = L.el[id];
@@ -193,7 +196,7 @@ export function createUiEditor({ onOpenChange = () => { }, onUiRestore = () => {
   }
   function renderSel() {
     const s = panel && panel.querySelector('#ueSel'); if (!s) return; const m = META[sel], e = L.el[sel] || {}, o = e.o !== undefined ? e.o : 1;
-    s.innerHTML = `<b class="ue-name">${m.label}</b>` + (m.kind === 'm' ? `<button class="sb" data-a="minus">−</button><b class="ue-pct">${Math.round(((e.s) || 1) * 100)}%</b><button class="sb" data-a="plus">+</button>` : '<small>moves with TOP BAR</small>')
+    s.innerHTML = `<b class="ue-name">${m.label}</b>` + (m.kind === 'm' ? `<button class="sb" data-a="minus">−</button><b class="ue-pct">${Math.round(((e.s) || 1) * 100)}%</b><button class="sb" data-a="plus">+</button>` : '<small>moves with its group</small>')
       + `opacity<input type="range" min="0.1" max="1" step="0.05" value="${o}" data-o="1"><b>${Math.round(o * 100)}%</b>`
       + (m.ess ? '<small>always shown</small>' : `<button class="sb${e.h ? ' sel' : ''}" data-a="hide">${e.h ? '◌ SHOW' : '◉ HIDE'}</button>`)
       + (e.x ? '<button class="sb" data-a="unpos">⌂ DEFAULT POS</button>' : '');

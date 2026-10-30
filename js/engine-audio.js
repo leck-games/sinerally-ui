@@ -104,7 +104,7 @@ export function createEngineAudio({ sr, log = console } = {}) {
       const d = validate(await withTimeout(importModule(url), 10000, 'import'));
       if (my !== token) return false;
       const b = ctx.createGain(); b.connect(master);
-      const veh = T.vehicle || 'buggy';
+      const veh = (sr && sr.telemetry.vehicle) || T.vehicle || 'buggy'; prev.vehicle = veh; // a vehicle switch racing the async load is caught by frame()
       const opts = { apiVersion: HOST_API_VERSION, preset: presetFor(d, veh), vehicle: veh, vehiclePreset: sr ? sr.telemetry.soundPreset : undefined, host: 'sinerally' };
       let i;
       try { i = await withTimeout(Promise.resolve(d.create(ctx, b, opts)), 10000, 'create()'); }

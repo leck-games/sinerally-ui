@@ -22,6 +22,7 @@ import { melts } from './phys/attachments/index.js';
 import { PLANES, getPlane, buildPlane, createPlaneState, spawnRunway, spawnAir, stepPlane } from './plane.js'; // SineRally UI: flyable planes
 import { openPlaneSelector } from './plane-select.js';
 import { createAirfields } from './airfields.js';
+let audio = null; // engine sound host (created after the telemetry block)
 import { createVehicleShadow } from './vshadow.js';
 const { WATER, nearTrack, trackPoint, hash2, sample, surfaceOf, colourOf, normal, height, ground } = W;
 const $ = id => document.getElementById(id);
@@ -66,7 +67,7 @@ function applyQuality() {
   const q = QUAL[qName], pr = Math.min(devicePixelRatio, q.pr) * dynS;
   renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight); U.uPx.value = pr; U.uHatch.value = q.hatch; post.uniforms.uFx.value = q.fx;
   const w = Math.floor(innerWidth * pr), h = Math.floor(innerHeight * pr); rt.setSize(w, h); post.uniforms.uRes.value.set(w, h); post.uniforms.uThick.value = Math.max(1.6, pr * 1.4);
-  if (q.sr !== lastSr) { scx = 1e9; lastSr = q.sr; } $('tQ').textContent = 'GFX: ' + qName; window.__pr = pr;
+  if (q.sr !== lastSr) { scx = 1e9; lastSr = q.sr; } if (typeof quickLabels === 'function' && audio) quickLabels(); window.__pr = pr;
   if (grassMesh) grassMesh.geometry.instanceCount = Math.min(q.grass, grassMax);
   if (T.setRoadDetail) T.setRoadDetail(q.rd, q.rd ? renderer.capabilities.getMaxAnisotropy() : 4); U.uDet.value = q.det; if (vshadow) vshadow.setSize(q.sh); if (AFX) AFX.setDetail(q.rd, q.rd ? renderer.capabilities.getMaxAnisotropy() : 4);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -247,12 +248,12 @@ function joyMove(e) { for (const t of e.changedTouches) if (t.identifier === joy
 });
 $('tTilt').onclick = async () => {
   if (!tilt && typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) { try { if (await DeviceOrientationEvent.requestPermission() !== 'granted') return; } catch (e) { return; } }
-  tilt = !tilt; $('tTilt').textContent = 'Tilt: ' + (tilt ? 'on' : 'off');
+  tilt = !tilt; msg('TILT STEERING ' + (tilt ? 'ON' : 'OFF')); if (audio) quickLabels();
 };
 addEventListener('deviceorientation', e => { const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0; const v = a === 90 ? e.beta : a === -90 || a === 270 ? -e.beta : e.gamma; tiltSteer = Math.max(-1, Math.min(1, (v || 0) / 25)); });
 $('tReset').onclick = () => reset(); $('tDbg').onclick = () => toggleDbg(); $('tQ').onclick = () => cycleQ();
-let dbg = QS.has('dbg'); function toggleDbg() { dbg = !dbg; if (!dbg) $('dbg').textContent = ''; }
-function reset() { if (editorOpen()) return; if (craft === 'plane') { planeToRunway(); return; } const n = [0, 0, 0]; let x = veh.p.x, z = veh.p.z, yaw = PH.yawOf(veh); for (let k = 0; k < 40; k++) { normal(x, z, n); if (n[1] > 0.9 && height(x, z) > WATER + 2) break; x += 6 * Math.sin(yaw + k); z += 6 * Math.cos(yaw + k); } spawn(x, z, yaw); }
+let dbg = QS.has('dbg'); function toggleDbg() { dbg = !dbg; if (!dbg) $('dbg').textContent = ''; if (audio) quickLabels(); }
+function reset() { if (editor.benching) return; if (craft === 'plane') { planeToRunway(); return; } const n = [0, 0, 0]; let x = veh.p.x, z = veh.p.z, yaw = PH.yawOf(veh); for (let k = 0; k < 40; k++) { normal(x, z, n); if (n[1] > 0.9 && height(x, z) > WATER + 2) break; x += 6 * Math.sin(yaw + k); z += 6 * Math.cos(yaw + k); } spawn(x, z, yaw); }
 const inp = { gas: 0, brake: 0, steer: 0, hand: 0, boost: 0, pitch: 0 };
 const auto = QS.get('auto'); // test driver: ?auto=1|drift|boost drives itself (headless tests / screenshots)
 let simT = 0, steerSm = 0;
@@ -284,6 +285,7 @@ function buildGates(t) {
 let msgT = 0; function msg(s) { $('msg').textContent = s; $('msg').classList.remove('pop'); void $('msg').offsetWidth; $('msg').classList.add('pop'); msgT = 2; }
 const fmt = t => (t / 60 | 0) + ':' + (t % 60).toFixed(2).padStart(5, '0');
 function raceUpdate(dt) {
+  if (craft === 'plane') { race = null; document.body.classList.remove('racing'); return; } // races are a car thing: no race bar / RACE ABANDONED in the air
   const px = veh.p.x, pz = veh.p.z, t = nearTrack(px, pz); if (t !== curTrack) { buildGates(t); race = null; }
   const nr = i => Math.hypot(px - cps[i].x, pz - cps[i].z) < 13;
   if (!race) { if (nr(0)) { race = { t: 0, next: 1 }; msg('GO!'); } }
@@ -293,7 +295,8 @@ function raceUpdate(dt) {
     if (Math.hypot(px - t.cx, pz - t.cz) > t.R * 2.2) { race = null; msg('RACE ABANDONED'); } }
   propMat.uniforms.uDone.value = race ? race.next - 1 : 0;
   const b = best[t.id];
-  $('race').innerHTML = race ? `LAP ${fmt(race.t)} · CP ${race.next - 1}/${NCP - 1}` + (b ? `<br><small>BEST ${fmt(b)}</small>` : '') : (b ? `TRACK ${t.id} · BEST ${fmt(b)}` : 'FREE ROAM · drive through the checkered gate to race');
+  const near = !race && Math.hypot(px - cps[0].x, pz - cps[0].z) < 45; document.body.classList.toggle('racing', !!race || near); // race bar only in a race (or at the start gate)
+  $('race').innerHTML = race ? `LAP ${fmt(race.t)} · CP ${race.next - 1}/${NCP - 1}` + (b ? `<br><small>BEST ${fmt(b)}</small>` : '') : near ? `🏁 DRIVE THROUGH THE GATE TO RACE` + (b ? `<br><small>TRACK ${t.id} · BEST ${fmt(b)}</small>` : '') : '';
 }
 // ---------- minimap (comic: inked roads, loop, start gate) ----------
 const mc = $('mini').getContext('2d'); let mapPaths = [], mapAt = [1e9, 1e9];
@@ -306,7 +309,7 @@ function minimap(yaw) {
     const n = e.loop ? 64 : 16; for (let i = 0; i <= n; i++) { W.pathPoint(e, i / n, false); const x = (W.PP.x - px) * sc, y = (W.PP.z - pz) * sc; i ? mc.lineTo(x, y) : mc.moveTo(x, y); } mc.stroke();
   }
   AFX.draw(mc, (x, z) => [(x - px) * sc, (z - pz) * sc], sc);
-  const s = cps[0]; let sx = (s.x - px) * sc, sz = (s.z - pz) * sc; const d = Math.hypot(sx, sz); if (d > 55) { sx *= 55 / d; sz *= 55 / d; }
+  const s = cps[0] || { x: px, z: pz }; /* no track yet (first frames after load) */ let sx = (s.x - px) * sc, sz = (s.z - pz) * sc; const d = Math.hypot(sx, sz); if (d > 55) { sx *= 55 / d; sz *= 55 / d; }
   mc.fillStyle = '#fff'; mc.strokeStyle = '#111'; mc.lineWidth = 2; mc.beginPath(); mc.arc(sx, sz, 6, 0, 7); mc.fill(); mc.stroke();
   const clampR = (x, y) => { const d = Math.hypot(x, y); return d > 58 ? [x * 58 / d, y * 58 / d] : [x, y]; };
   for (const v of vNear) { const [x, y] = clampR((v.x - px) * sc, (v.z - pz) * sc); mc.fillStyle = vFound[v.key] ? '#ffd23c' : '#fff'; mc.beginPath(); mc.moveTo(x, y - 6); mc.lineTo(x + 6, y); mc.lineTo(x, y + 6); mc.lineTo(x - 6, y); mc.closePath(); mc.fill(); mc.stroke(); }
@@ -426,7 +429,7 @@ function tickCans(t) {
     msg('FUEL +1  (' + cansGot.size + ')'); for (let q = 0; q < 16; q++) { const a = q / 16 * 6.28; puff(c.x, c.y + 1.5, c.z, Math.cos(a) * 5, 3, Math.sin(a) * 5, 1.1, 0.6, [1, 0.85, 0.2]); } } }
   canMesh.count = cans.length;
   cans.forEach((c, k) => { Qt.setFromEuler(Et.set(0, t * 2 + c.x, 0.15)); Mx.compose(Vt.set(c.x, c.y + 0.9 + 0.3 * Math.sin(t * 3 + c.z), c.z), Qt, St.set(1.8, 1.8, 1.8)); canMesh.setMatrixAt(k, Mx); });
-  canMesh.instanceMatrix.needsUpdate = true; $('cans').textContent = '⛽ ' + cansGot.size;
+  canMesh.instanceMatrix.needsUpdate = true; $('cans').textContent = '⛽ ' + cansGot.size; document.body.classList.toggle('hascans', cansGot.size > 0);
 }
 // ---------- landmarks / vistas: the highest of 10 hashed samples per 1.2 km lattice cell; discovered within 70 m ----------
 const VC = 1200, vCache = new Map(), vFound = JSON.parse(localStorage.getItem('sinerally_vistas') || '{}');
@@ -495,64 +498,103 @@ function drawMap() {
 }
 mcv.addEventListener('click', e => { const P = mapProject(), dpr = mcv.width / innerWidth, x = e.clientX * dpr, y = e.clientY * dpr;
   setWp({ x: mapC[0] - (x - P.Wp / 2) / P.S, z: mapC[1] - (y - P.Hp / 2) / P.S }); });
-// ---------- menu (☰): vehicle selector (3D preview), attachments, assists, time, weather, graphics, garage actions ----------
-let selector = null;
+// ---------- menu (☰): tabbed sheet — DRIVE/FLY · VEHICLE · SOUND · GRAPHICS · CONTROLS/HUD · WORLD ----------
+let selector = null, mTab = 'drive';
+const TABS = { drive: () => craft === 'plane' ? 'FLY' : 'DRIVE', vehicle: () => 'VEHICLE', sound: () => 'ENGINE SOUND', gfx: () => 'GRAPHICS', hud: () => 'CONTROLS & HUD', world: () => 'WORLD' };
+const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+function segRows(el, rows) { // [label, options, get, set, note?] → a row of toggle buttons
+  for (const [label, opts, get, set, note] of rows) { const r = mk('div', 'mrow'); r.appendChild(mk('span', '', label));
+    for (const o of opts) { const b = mk('button', 'sb' + (get() === o ? ' sel' : ''), String(o).toUpperCase()); b.onclick = () => { set(o); buildMenu(); }; r.appendChild(b); }
+    el.appendChild(r); if (note) el.appendChild(mk('div', 'mnote', note)); } }
+function actRow(el, title, acts) { el.appendChild(mk('div', 'msec', title)); const g = mk('div', 'mrow');
+  for (const [t, f, cls] of acts) { const b = mk('button', 'sb' + (cls ? ' ' + cls : ''), t); b.onclick = () => { f(); if (menuOpen) buildMenu(); }; g.appendChild(b); } el.appendChild(g); return g; }
 function buildMenu() {
-  const rows = [
-    ['STABILITY ASSIST', ['On', 'Off'], () => assist.stab ? 'On' : 'Off', v => { assist.stab = veh.assist.stab = v === 'On'; localStorage.setItem('sinerally_stab', assist.stab ? '1' : '0'); }],
-    ['TRACTION CONTROL', ['On', 'Off'], () => assist.tc ? 'On' : 'Off', v => { assist.tc = veh.assist.tc = v === 'On'; localStorage.setItem('sinerally_tc', assist.tc ? '1' : '0'); }],
-    ['TIME OF DAY', ['Auto', 'Day', 'Sunset', 'Night'], () => timeMode, v => { timeMode = v; localStorage.setItem('sinerally_time', v); applyTime(); }],
-    ['WEATHER', WX_MODES, () => wxMode, v => { wxMode = v; localStorage.setItem('sinerally_wx', v); applyWx(); }],
-    ['GRAPHICS', Q_ORDER, () => qName, setQual],
-    ['HANDLING', ['Arcade', 'Normal'], () => hMode === 'arcade' ? 'Arcade' : 'Normal', v => setHandling(v.toLowerCase())],
-    ['UI', ['Full', 'Minimal', 'None'], () => uiMode[0].toUpperCase() + uiMode.slice(1), v => setUi(v.toLowerCase())],
-    ['PLANE PITCH', ['Stick', 'Inverted'], () => pitchInv ? 'Inverted' : 'Stick', v => { pitchInv = v === 'Inverted'; localStorage.setItem('sinerally_pinv', pitchInv ? '1' : '0'); }]];
-  const el = $('mRows'); el.innerHTML = '';
-  for (const [label, opts, get, set] of rows) { const r = document.createElement('div'); r.className = 'mrow'; r.innerHTML = `<span>${label}</span>`;
-    for (const o of opts) { const b = document.createElement('button'); b.className = 'sb' + (get() === o ? ' sel' : ''); b.textContent = o.toUpperCase(); b.onclick = () => { set(o); buildMenu(); }; r.appendChild(b); } el.appendChild(r); }
-  const g = document.createElement('div'); g.className = 'mrow'; g.innerHTML = '<span>GARAGE</span>';
-  const act = (t, f) => { const b = document.createElement('button'); b.className = 'sb'; b.textContent = t; b.onclick = () => { f(); buildMenu(); }; g.appendChild(b); };
-  if (craft === 'plane') { act('RESET TO RUNWAY', () => planeToRunway()); for (const a of W.AF) if (plDef.id !== 'jet' || a.paved) act('✈ ' + a.name, () => { planeToRunway(a); openMenu(false); });
-    act('AIR START', () => { planeAirStart(); openMenu(false); }); act('🚗 DRIVE CAR', () => { setCraft('car'); vehRow(); }); }
-  else { act('REPAIR', () => { PH.repair(veh); msg('REPAIRED'); }); act('✈ FLY A PLANE', () => { setCraft('plane'); vehRow(); }); }
-  if (veh.cargo.capacity > 0) act('UNLOAD LOGS (' + veh.cargo.logs + ')', () => rig.unload());
-  act('REGROW TREES & ROCKS', () => { T.resetTrees(); afReclear(); hpMap.clear(); rockGone.clear(); store.set('sinerally_rocks_gone', []); scx = 1e9; msg('SCENERY REGROWN'); });
-  act('PUT OUT FIRES', () => { T.extinguishAll(); });
-  el.appendChild(g);
-  const info = document.createElement('div'); info.className = 'mrow'; info.innerHTML = craft === 'plane' ? `<span>PLANE</span><small style="font:bold 11px Arial">${plDef.name} · flights ${pl.flights} · landings ${pl.landings} · crashes ${pl.crashes}</small>` : `<span>CAR</span><small style="font:bold 11px Arial">damage ${veh.damage.toFixed(0)}% · engine ${veh.heat.temp.toFixed(0)}°C${veh.cargo.capacity ? ` · logs ${veh.cargo.logs}/${veh.cargo.capacity}` : ''}</small>`; el.appendChild(info);
+  const PL = craft === 'plane';
+  $('mtDrive').textContent = PL ? 'FLY' : 'DRIVE'; document.querySelector('.mtab[data-tab=drive] i').textContent = PL ? '✈' : '🏁';
+  // DRIVE / FLY: quick actions, assists, handling, plane pitch, status
+  const d = $('mRows'); d.innerHTML = '';
+  if (PL) { actRow(d, 'FLIGHT', [['⟲ RESET TO RUNWAY', () => planeToRunway()], ['AIR START', () => { planeAirStart(); openMenu(false); }], ['🚗 DRIVE CAR', () => setCraft('car')]]);
+    const af = actRow(d, 'AIRFIELDS', []); for (const a of W.AF) if (plDef.id !== 'jet' || a.paved) { const b = mk('button', 'sb', '✈ ' + a.name); b.onclick = () => { planeToRunway(a); openMenu(false); }; af.appendChild(b); }
+    d.appendChild(mk('div', 'msec', 'CONTROLS'));
+    segRows(d, [['PLANE PITCH', ['Stick', 'Inverted'], () => pitchInv ? 'Inverted' : 'Stick', v => { pitchInv = v === 'Inverted'; localStorage.setItem('sinerally_pinv', pitchInv ? '1' : '0'); }, 'Stick: pull back (joystick down) = nose up. Inverted swaps it.']]);
+  } else {
+    const acts = [['⟲ RESET', () => { reset(); openMenu(false); }], ['🔧 REPAIR', () => { PH.repair(veh); msg('REPAIRED'); }], ['✈ FLY A PLANE', () => setCraft('plane')]];
+    if (veh.cargo.capacity > 0) acts.push(['UNLOAD LOGS (' + veh.cargo.logs + ')', () => rig.unload()]);
+    actRow(d, 'CAR', acts); d.appendChild(mk('div', 'msec', 'HANDLING & ASSISTS'));
+    segRows(d, [['HANDLING', ['Arcade', 'Normal'], () => hMode === 'arcade' ? 'Arcade' : 'Normal', v => setHandling(v.toLowerCase())],
+      ['STABILITY ASSIST', ['On', 'Off'], () => assist.stab ? 'On' : 'Off', v => { assist.stab = veh.assist.stab = v === 'On'; localStorage.setItem('sinerally_stab', assist.stab ? '1' : '0'); }],
+      ['TRACTION CONTROL', ['On', 'Off'], () => assist.tc ? 'On' : 'Off', v => { assist.tc = veh.assist.tc = v === 'On'; localStorage.setItem('sinerally_tc', assist.tc ? '1' : '0'); }]]);
+  }
+  d.appendChild(mk('div', 'msec', 'STATUS'));
+  d.appendChild(mk('div', 'mnote', PL ? `${plDef.name} · flights ${pl.flights} · landings ${pl.landings} · crashes ${pl.crashes}` : `${vDef.name} · damage ${veh.damage.toFixed(0)}% · engine ${veh.heat.temp.toFixed(0)}°C${veh.cargo.capacity ? ` · logs ${veh.cargo.logs}/${veh.cargo.capacity}` : ''} · fuel cans ${cansGot.size}`));
+  // GRAPHICS
+  const g = $('mGfx'); g.innerHTML = '';
+  segRows(g, [['QUALITY', Q_ORDER, () => qName, setQual, 'LOW = fastest · MED = default on phones · HIGH = sharp road textures + shadows · ULTRA = max textures, draw distance, grass (reload for full distance).'],
+    ['FPS / DEBUG', ['Off', 'On'], () => dbg ? 'On' : 'Off', v => { if ((v === 'On') !== dbg) toggleDbg(); }]]);
+  g.appendChild(mk('div', 'mnote', 'Dynamic resolution keeps the frame rate up' + (DYN ? ' (on).' : ' (off: ?dyn=0).')));
+  // CONTROLS & HUD
+  const hu = $('mHud'); hu.innerHTML = '';
+  const e1 = mk('button', 'sb mbig', '✥ EDIT HUD LAYOUT'); e1.id = 'mEditUi'; e1.style.cssText = 'background:var(--o);color:#fff'; e1.onclick = () => { openMenu(false); uied.openEd(); };
+  const r0 = mk('div', 'mrow'); r0.appendChild(e1); hu.appendChild(r0); hu.appendChild(mk('div', 'mnote', 'Drag, scale, hide or fade every HUD element; save presets and slots. Keyboard: U.'));
+  segRows(hu, [['HUD MODE', ['Full', 'Minimal', 'None'], () => uiMode[0].toUpperCase() + uiMode.slice(1), v => setUi(v.toLowerCase()), 'NONE keeps only a faint ☰ ⚙ corner (and the touch controls). Keyboard: I.'],
+    ['TILT STEERING', ['Off', 'On'], () => tilt ? 'On' : 'Off', v => { if ((v === 'On') !== tilt) $('tTilt').onclick(); }]]);
+  hu.appendChild(mk('div', 'msec', 'KEYBOARD'));
+  hu.appendChild(mk('div', 'mnote', 'Car: WASD/arrows · Space drift · Shift boost · R reset · H handling · V next vehicle · P plane/car · M map · G graphics · F FPS · Shift+U unload. Plane: W/S throttle · arrows pitch/roll · A/D rudder · B brake · Shift afterburner.'));
+  // WORLD
+  const w = $('mWorld'); w.innerHTML = '';
+  segRows(w, [['TIME OF DAY', ['Auto', 'Day', 'Sunset', 'Night'], () => timeMode, v => { timeMode = v; localStorage.setItem('sinerally_time', v); applyTime(); }],
+    ['WEATHER', WX_MODES, () => wxMode, v => { wxMode = v; localStorage.setItem('sinerally_wx', v); applyWx(); }]]);
+  actRow(w, 'SCENERY', [['🗺 OPEN MAP', () => { openMenu(false); openMap(true); }], ['🌲 REGROW TREES & ROCKS', () => { T.resetTrees(); afReclear(); hpMap.clear(); rockGone.clear(); store.set('sinerally_rocks_gone', []); scx = 1e9; msg('SCENERY REGROWN'); }], ['🔥 PUT OUT FIRES', () => { T.extinguishAll(); }]]);
+  w.appendChild(mk('div', 'mnote', `Vistas found ${Object.keys(vFound).length} · fuel cans ${cansGot.size}`));
 }
+function showTab(t) { if (!TABS[t]) t = 'drive'; mTab = t;
+  document.querySelectorAll('#mTabs .mtab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('#mPanes .mpane').forEach(p => p.classList.toggle('on', p.dataset.pane === t)); $('mTitle').textContent = TABS[t]();
+  if (t === 'vehicle') { if (!selector) vehRow(); } else if (selector) { selector.close(); selector = null; $('mVeh').innerHTML = ''; } // the 3D preview only runs on its tab
+  if (t === 'sound') audio.buildMenu($('mSnd')); $('mPanes').scrollTop = 0; }
+document.querySelectorAll('#mTabs .mtab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 let vTab = null; // VEHICLE tab: 'car' | 'plane' (defaults to the current craft)
 function vehRow() { // VEHICLE: CARS (physics module's selector) / PLANES (plane selector), each a second small WebGL canvas closed with the menu
-  const mv = $('mVeh'); mv.style.display = 'block'; if (selector) { selector.close(); selector = null; }
-  const tab = vTab || craft; mv.innerHTML = ''; const h = document.createElement('div'); h.className = 'mrow'; h.innerHTML = '<span>VEHICLE</span>';
-  for (const [k, t] of [['car', '🚗 CARS'], ['plane', '✈ PLANES']]) { const b = document.createElement('button'); b.className = 'sb vtab' + (tab === k ? ' sel' : ''); b.id = 'vt_' + k; b.textContent = t; b.onclick = () => { vTab = k; vehRow(); }; h.appendChild(b); }
+  const mv = $('mVeh'); if (selector) { selector.close(); selector = null; }
+  const tab = vTab || craft; mv.innerHTML = ''; const h = mk('div', 'mrow');
+  for (const [k, t] of [['car', '🚗 CARS'], ['plane', '✈ PLANES']]) { const b = mk('button', 'sb vtab mbig' + (tab === k ? ' sel' : ''), t); b.id = 'vt_' + k; b.onclick = () => { vTab = k; vehRow(); }; h.appendChild(b); }
   mv.appendChild(h); const box = document.createElement('div'); mv.appendChild(box);
   const small = innerHeight < 500, size = small ? [200, 113] : [240, 136];
   if (tab === 'plane') { $('mAtt').innerHTML = ''; selector = openPlaneSelector({ container: box, current: plDef ? plDef.id : (localStorage.getItem('sinerally_plane') || 'cub'), size, onPick: id => { setCraft('plane', id); buildMenu(); } }); }
   else { selector = openSelector({ THREE, container: box, current: vDef.id, size, onPick: id => { if (craft === 'plane') setCraft('car'); setVehicle(id); attRow(); buildMenu(); } }); attRow(); }
 }
-function attRow() { const ma = $('mAtt'); ma.innerHTML = '<div class="mrow"><span>ATTACHMENTS · ' + vDef.name + '</span></div>'; const c = document.createElement('div'); ma.appendChild(c);
+function attRow() { const ma = $('mAtt'); ma.innerHTML = '<div class="msec">ATTACHMENTS · ' + vDef.name + '</div>'; const c = document.createElement('div'); ma.appendChild(c);
   renderPicker({ container: c, vehicle: vDef, selected: rig.attach, onChange: ids => { setAttachments(ids); buildMenu(); } }); }
 let menuOpen = false;
-function openMenu(o) { menuOpen = o; $('menu').style.display = o ? 'block' : 'none';
-  if (o) { vTab = null; buildMenu(); vehRow(); audio.buildMenu($('mSnd')); } else { if (selector) { selector.close(); selector = null; } $('mVeh').style.display = 'none'; sndBtn(); } }
-$('tMenu').onclick = () => openMenu(!menuOpen); $('mEditUi').onclick = () => { openMenu(false); uied.openEd(); }; $('mnClose').onclick = () => openMenu(false); // ☰ → EDIT UI (header button)
-$('mini').addEventListener('click', () => openMap(true)); $('mClose').onclick = () => openMap(false); $('mClr').onclick = () => setWp(null);
-$('mZin').onclick = () => { mapSpan = Math.max(1500, mapSpan / 2); openMap(true); }; $('mZout').onclick = () => { mapSpan = Math.min(20000, mapSpan * 2); openMap(true); };
+function openMenu(o, tab) { menuOpen = !!o; $('menu').classList.toggle('on', menuOpen); $('tMenu').classList.toggle('sel', menuOpen); if (menuOpen) quick(false);
+  if (menuOpen) { vTab = null; buildMenu(); showTab(tab || mTab); } else { if (selector) { selector.close(); selector = null; } $('mVeh').innerHTML = ''; sndBtn(); } }
+$('tMenu').onclick = () => openMenu(!menuOpen); $('mnClose').onclick = () => openMenu(false);
+// ---------- ⚙ quick-settings tray: RESET · GFX · ARC/NRM · HUD mode · TILT · FPS · SOUND · MAP (closes on an outside tap or after 8 s) ----------
+let qOpen = false, qT = 0;
+function quick(o) { qOpen = o == null ? !qOpen : !!o; $('qtray').classList.toggle('on', qOpen); $('tQuick').classList.toggle('sel', qOpen); qT = 8;
+  if (qOpen) { const r = $('corner').getBoundingClientRect(); $('corner').classList.toggle('left', r.left < innerWidth / 2 - 60); $('corner').classList.toggle('up', r.top > innerHeight / 2); quickLabels(); } }
+function quickLabels() { const L = (id, big, small, on) => { const e = $(id); e.innerHTML = big + '<small>' + small + '</small>'; e.classList.toggle('on', !!on); };
+  L('tQ', qName.toUpperCase(), 'GRAPHICS'); L('tHand', hMode === 'arcade' ? 'ARC' : 'NRM', 'HANDLING'); L('tUi', uiMode === 'full' ? '◉ FULL' : uiMode === 'minimal' ? '◐ MIN' : '○ NONE', 'HUD');
+  L('tTilt', tilt ? 'ON' : 'OFF', 'TILT', tilt); L('tDbg', dbg ? 'ON' : 'OFF', 'FPS', dbg); L('tSnd', audio && audio.muted ? '🔇 OFF' : '🔊 ON', 'SOUND'); let pm = false; try { pm = craft === 'plane'; } catch (e) { } L('tReset', '⟲', pm ? 'RUNWAY' : 'RESET'); L('tMap', '🗺', 'MAP'); }
+$('tQuick').onclick = () => quick();
+addEventListener('pointerdown', e => { if (qOpen && !$('corner').contains(e.target)) quick(false); }, true);
+$('qtray').addEventListener('click', () => { qT = 8; setTimeout(quickLabels, 0); });
+$('tMap').onclick = () => { quick(false); openMap(true); };
 addEventListener('keydown', e => { if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-  if (e.code === 'KeyM' || e.code === 'Tab') { openMap(!mapOpen); e.preventDefault(); } if (e.code === 'Escape') { openMap(false); openMenu(false); editor.close(); if (uied) uied.close(); }
+  if (e.code === 'KeyM' || e.code === 'Tab') { openMap(!mapOpen); e.preventDefault(); } if (e.code === 'Escape') { if (editor.open || uied.open || mapOpen) { openMap(false); editor.close(); uied.close(); } else openMenu(!menuOpen); quick(false); }
   if (uied && uied.open) { if (e.code === 'KeyU') uied.close(); return; } // layout editor open: game keys paused
   if (e.code === 'KeyP' && !editorOpen()) { setCraft(craft === 'plane' ? 'car' : 'plane'); return; }
-  if (e.code === 'KeyV') { if (craft === 'plane') { const i = PLANES.findIndex(p => p.id === plDef.id); setCraft('plane', PLANES[(i + 1) % PLANES.length].id); } else { const l = listVehicles(), i = l.findIndex(v => v.id === vDef.id); setVehicle(l[(i + 1) % l.length].id); } } if (e.code === 'KeyP') setCraft(craft === 'plane' ? 'car' : 'plane'); if (e.code === 'KeyU') { if (e.shiftKey) rig.unload(); else uied.openEd(); } /* U = EDIT UI (unload moved to Shift+U) */ if (e.code === 'KeyH') setHandling(hMode === 'arcade' ? 'normal' : 'arcade'); if (e.code === 'KeyI') cycleUi(); });
+  if (e.code === 'KeyV') { if (craft === 'plane') { const i = PLANES.findIndex(p => p.id === plDef.id); setCraft('plane', PLANES[(i + 1) % PLANES.length].id); } else { const l = listVehicles(), i = l.findIndex(v => v.id === vDef.id); setVehicle(l[(i + 1) % l.length].id); } }
+  if (e.code === 'KeyU') { if (e.shiftKey) rig.unload(); else uied.openEd(); } /* U = EDIT UI (unload: Shift+U) */ if (e.code === 'KeyH') setHandling(hMode === 'arcade' ? 'normal' : 'arcade'); if (e.code === 'KeyI') cycleUi(); });
 // ---------- HUD toggles: handling ARC/NRM, UI hide (FULL → MINIMAL → NONE), unload (only with logs) ----------
 function setHandling(m) { hMode = m === 'normal' ? 'normal' : 'arcade'; rig.setMode(hMode); localStorage.setItem('sinerally_handling', hMode); store.set('srp_handling', hMode);
-  $('tHand').textContent = hMode === 'arcade' ? 'ARC' : 'NRM'; $('tHand').classList.toggle('nrm', hMode === 'normal'); steerSm = 0; return hMode; }
+  $('tHand').classList.toggle('nrm', hMode === 'normal'); steerSm = 0; if (typeof quickLabels === 'function' && audio) quickLabels(); return hMode; }
 let uied = null; // layout editor (created below, after the sound editor)
 const UI_MODES = ['full', 'minimal', 'none']; let uiMode = UI_MODES.includes(localStorage.getItem('sinerally_ui')) ? localStorage.getItem('sinerally_ui') : 'full', unlShown = null;
 function setUi(m) { uiMode = UI_MODES.includes(m) ? m : 'full'; localStorage.setItem('sinerally_ui', uiMode); document.body.classList.toggle('ui-min', uiMode === 'minimal'); document.body.classList.toggle('ui-none', uiMode === 'none');
-  $('tUi').textContent = uiMode === 'full' ? '◉' : uiMode === 'minimal' ? '◐' : '○'; $('tUi').title = 'UI: ' + uiMode.toUpperCase() + ' (I)'; if (uied) uied.applyAll(); return uiMode; }
+  $('tUi').title = 'HUD: ' + uiMode.toUpperCase() + ' (I)'; if (audio) quickLabels(); if (uied) uied.applyAll(); return uiMode; }
 function cycleUi() { return setUi(UI_MODES[(UI_MODES.indexOf(uiMode) + 1) % 3]); }
-$('tUi').onclick = () => { cycleUi(); msg('UI ' + uiMode.toUpperCase()); }; $('tHand').onclick = () => { setHandling(hMode === 'arcade' ? 'normal' : 'arcade'); msg(hMode.toUpperCase() + ' HANDLING'); };
+$('tUi').onclick = () => { cycleUi(); msg('HUD ' + uiMode.toUpperCase()); }; $('tHand').onclick = () => { setHandling(hMode === 'arcade' ? 'normal' : 'arcade'); msg(hMode.toUpperCase() + ' HANDLING'); };
 $('bUnl').onclick = () => rig.unload(); setUi(uiMode); setHandling(hMode);
 // ---------- telemetry + event hooks (read-only window.SR; see PLUGIN_API.md / MERGE_NOTES.md) ----------
 const TEL = { rpm: 0, idle: 0, redline: 0, throttle: 0, brake: 0, boost: false, nitro: 1, gear: 1, gears: 6, shifting: false, load: 0, speed: 0, fwdSpeed: 0, grounded: 0, air: 0,
@@ -565,12 +607,12 @@ function updateTelemetry() {
 const roProxy = o => new Proxy(o, { set() { return false; }, get(t, k) { const v = t[k]; return v && typeof v === 'object' ? roProxy(v) : v; } });
 window.SR = Object.freeze({ telemetry: roProxy(TEL), on(type, fn) { (listeners[type] || (listeners[type] = [])).push(fn); }, off(type, fn) { const l = listeners[type]; if (l) l.splice(l.indexOf(fn) >>> 0, 1); } });
 // engine sound: the host only reads window.SR (telemetry + events), the plugin only sees the API v1 telemetry
-const audio = createEngineAudio({ sr: window.SR });
+audio = createEngineAudio({ sr: window.SR });
 // optional engine sound editor (☰ → ENGINE SOUND → EDIT): only shown when the active plugin has setConfig/getConfig
-const editor = createSoundEditor({ audio, onOpenChange: o => { if (o) openMenu(false); } });
+const editor = createSoundEditor({ audio, onOpenChange: o => { if (o) { openMenu(false); quick(false); } } });
 const editorOpen = () => editor.open;
 uied = createUiEditor({ onOpenChange: o => { if (o) { openMenu(false); openMap(false); editor.close(); } else last = performance.now(); }, onUiRestore: () => setUi(uiMode) });
-const sndBtn = () => { $('tSnd').textContent = audio.muted ? '🔇' : '🔊'; };
+const sndBtn = () => quickLabels();
 $('tSnd').onclick = () => { if (!audio.running) { audio.unlock(); audio.setMuted(false); } else audio.setMuted(!audio.muted); sndBtn(); }; sndBtn(); // first tap = enable sound
 
 // ---------- SineRally UI: planes (js/plane.js) on the procedural airfields (js/airfields.js). craft = 'car' | 'plane' ----------
@@ -633,7 +675,7 @@ function readPlaneInput(dt) { // keys: A/D ←/→ roll, ↑ nose down / ↓ nos
   pin.pitch = pPitchSm; pin.roll = pRollSm; pin.yaw = pYawSm; pin.thr = thrLever;
   pin.brake = key.Space || touch.drf || (dn && thrLever <= 0 && pl.onGround) ? 1 : 0; pin.boost = key.ShiftLeft || key.ShiftRight || touch.bst ? 1 : 0;
   if (plAuto) { Object.assign(pin, typeof plAuto === 'function' ? plAuto(pl, simT) : plAuto); thrLever = pin.thr; } // headless tests: scripted pilot
-  if (editor.open) { pin.pitch = pin.roll = pin.yaw = 0; }
+  if (editor.benching) { pin.pitch = pin.roll = pin.yaw = 0; }
 }
 bus.on('plane:crash', d => { shake = 1; msg('CRASH! ' + String(d.cause || '').toUpperCase()); popText('KA-BOOM!', d.x, d.y + 4, d.z, '#ff5030');
   for (let k = 0; k < 28; k++) { const a = Math.random() * 6.28, v = 2 + Math.random() * 8; puff(d.x, d.y + Math.random() * 2, d.z, Math.cos(a) * v, 2 + Math.random() * 6, Math.sin(a) * v, 1.6 + Math.random() * 1.8, 1.1 + Math.random(), k % 3 ? [0.3, 0.28, 0.27] : [1, 0.62, 0.18]); } });
@@ -745,15 +787,15 @@ function frame(now) {
   if (uied.open) { audio.frame(dt, true); last = now; return; } // UI layout editor pauses the game (last frame stays on screen)
   const PLN = craft === 'plane';
   if (PLN) readPlaneInput(dt); else readInput(dt);
-  if (editor.open && !PLN) { inp.gas = inp.brake = inp.boost = 0; inp.steer = 0; inp.hand = 1; } // sound editor open: car input paused (audio keeps running)
-  if (PLN && (menuOpen || editor.open)) acc = 0; // planes can't park in mid-air: the menu / sound editor pause the flight
+  if (editor.benching && !PLN) { inp.gas = inp.brake = inp.boost = 0; inp.steer = 0; inp.hand = 1; } // sound editor open: car input paused (audio keeps running)
+  if (PLN && (menuOpen || editor.benching)) acc = 0; // planes can't park in mid-air: the menu / sound editor pause the flight
   acc += dt; let steps = 0; const tp = performance.now(); penv.arcade = hMode === 'arcade';
   while (acc >= STEP && steps < 12) { simT += STEP; if (PLN) stepPlane(pl, pin, STEP, penv); else { rig.step(inp, STEP); collideRocks(veh); AFX.collide(veh.p, veh.v); } acc -= STEP; steps++; }
   if (PLN && pl.crashed && pl.crashT > 2.6) planeToRunway(pickField(plDef, pl.p.x, pl.p.z));
   AFX.update(dt);
   if (steps === 12) acc = 0;
   stats.physMs = performance.now() - tp;
-  tickCans(tFrame); tickVistas(); updateWorld(false); raceUpdate(dt);
+  tickCans(tFrame); tickVistas(); updateWorld(false); raceUpdate(dt); if (qOpen && (qT -= dt) <= 0) quick(false);
   U.uHeadP.value.set(veh.p.x, veh.p.y, veh.p.z).addScaledVector(veh.fwd, 2).addScaledVector(veh.up, 0.8); U.uHeadD.value.set(veh.fwd.x, veh.fwd.y, veh.fwd.z).addScaledVector(veh.up, -0.12).normalize();
   const sp = Math.hypot(veh.v.x, veh.v.y, veh.v.z), boosting = veh.boosting;
   if (PLN) { planeVisuals(dt, sp); updatePuffs(dt); planeCam(dt, sp); } else {

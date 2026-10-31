@@ -20,7 +20,9 @@ const res = {}; const ok = (k, v, info) => { res[k] = { pass: !!v, info }; conso
   const moved = async ms => { const a = await pos(); await p.keyboard.down('ArrowUp'); await sleep(ms); await p.keyboard.up('ArrowUp'); const c = await pos(); return Math.hypot(c[0] - a[0], c[1] - a[1]); };
   await p.goto(URL, { waitUntil: 'load' }); await E(() => localStorage.clear()); await p.reload({ waitUntil: 'load' }); await sleep(4500);
   const title = await p.title(); const man = await E(() => fetch('manifest.webmanifest').then(r => r.json()));
-  ok('title + manifest', title === 'Sine Rally UI' && man.name === 'Sine Rally UI' && /sinerally-ui/.test(man.start_url), { title, name: man.name, start_url: man.start_url });
+  const vl = await p.evaluate(() => ({ href: document.getElementById('versionsLink').href, tag: document.getElementById('verTag').textContent, st: window.__st && __st.version }));
+  ok('V0.1: menu tag + VERSIONS link to the version manager', vl.tag === 'V0.1' && vl.href === 'https://leck-games.github.io/versions/' && vl.st === 'Sine Rally V0.1', vl);
+  ok('title + manifest', title === 'Sine Rally V0.1' && man.name === 'Sine Rally V0.1' && /sinerally-ui/.test(man.start_url), { title, name: man.name, start_url: man.start_url });
   const def = {}; for (const id of ['joy', 'bGas', 'bBst', 'bDrf', 'bBrk', 'mini', 'spdgrp', 'corner', 'gauge']) def[id] = await rect(id);
   let mv0 = await moved(1500); if (mv0 <= 1) { await sleep(3000); mv0 = await moved(1500); } ok('gameplay runs before edit', mv0 > 1, mv0); // retry once: cold swiftshader start can be slow
   // ---- open via ☰ → EDIT UI (touch taps)

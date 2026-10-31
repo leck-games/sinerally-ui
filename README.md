@@ -1,6 +1,9 @@
-# SineRally UI – Sine Rally with a fully customizable touch HUD
-Fork of the finished [Sine Rally](https://github.com/leck-games/sinerally) (frozen at b93c3b6) plus a HUD layout editor.
-Live: **https://leck-games.github.io/sinerally-ui/** (installs as its own home-screen app "Sine Rally UI").
+# Sine Rally V0.1
+This is the first numbered release of Sine Rally. It is built on the finished [Sine Rally](https://github.com/leck-games/sinerally) prototype (frozen at b93c3b6).
+- Live (latest): **https://leck-games.github.io/sinerally-ui/**. It installs as the home-screen app "Sine Rally V0.1".
+- The frozen V0.1 copy, and every earlier build, are in the version manager at **https://leck-games.github.io/versions/** (repo [leck-games/versions](https://github.com/leck-games/versions)).
+- Release: git tag `v0.1`, plus a GitHub Release named "Sine Rally V0.1".
+- The version is set in `js/version.js`, which drives the page title and the menu tag. For a new release, bump it, update `index.html`/`manifest.webmanifest`, tag it, and add the build to the versions repo (see its README).
 
 ## Trees: one comic LOD at every distance (2026-10-30)
 Trees now use the cel-shaded impostor cards (2 triangles per tree) at every distance; the high-poly near meshes are gone. The look matches

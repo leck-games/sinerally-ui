@@ -1,7 +1,7 @@
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23ff6a1a' stroke='black' stroke-width='2'/></svg>">
-<title>Sine Rally UI</title>
+<title>Sine Rally V0.1</title>
 <style>
 :root{--ink:#111;--paper:#f7e6b5;--y:#ffd23c;--o:#ff6a1a;--g:#38c45a;--r:#e8453c;--b:#3c7ce8;--fs-s:11px;--fs-m:13px;--fs-l:16px;--tap:44px;--rad:8px;--gap:8px;--sl:max(10px,env(safe-area-inset-left));--sr:max(10px,env(safe-area-inset-right));--st:max(6px,env(safe-area-inset-top));--sb:env(safe-area-inset-bottom,0px)}
 html,body{margin:0;height:100%;overflow:hidden;background:#f7e6b5;font-family:"Arial Black","Impact",system-ui,sans-serif;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -123,10 +123,10 @@ body.nocompass #compass,body.ui-none #compass{display:none!important}body:not(.n
 #sndEd.mini>*:not(.se-h):not(.se-lights){display:none}#sndEd.mini .se-h{margin:0}#sndEd.mini .se-h b{display:none}#sndEd.mini .se-h .sb{height:26px;min-height:0;min-width:30px}#sndEd.mini .se-lights{height:24px;flex:1;min-width:0;border-width:2px}
 #sndEd .se-row input[type=text]{width:110px;font:900 11px "Arial Black",system-ui;border:2px solid #111;padding:4px}#sndEd .se-named{display:inline-flex;gap:2px}
 </style><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Sine Rally UI">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Sine Rally V0.1">
 <meta name="theme-color" content="#ff6a1a"><meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<style>/* iOS home-screen */canvas{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#allBuilds{display:inline-block;text-decoration:none;font:900 12px "Arial Black",system-ui,sans-serif;color:#111;background:#fff;border:3px solid #111;border-radius:6px;padding:5px 9px;box-shadow:3px 3px 0 #111;-webkit-tap-highlight-color:transparent}/* SineRally UI: plane HUD (artificial horizon, throttle slider, rudder) — shown in plane mode, editable in the UI editor */
+<style>/* iOS home-screen */canvas{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#versionsLink{margin-left:6px;background:#ffd23c!important}#allBuilds,#versionsLink{display:inline-block;text-decoration:none;font:900 12px "Arial Black",system-ui,sans-serif;color:#111;background:#fff;border:3px solid #111;border-radius:6px;padding:5px 9px;box-shadow:3px 3px 0 #111;-webkit-tap-highlight-color:transparent}/* SineRally UI: plane HUD (artificial horizon, throttle slider, rudder) — shown in plane mode, editable in the UI editor */
 #pAtt{position:fixed;left:calc(50% - 30px);top:calc(max(6px,env(safe-area-inset-top)) + 46px);width:210px;height:104px;display:none;pointer-events:none;filter:drop-shadow(3px 3px 0 #1116)}
 #pThr{position:fixed;right:calc(max(22px,env(safe-area-inset-right)) + 186px);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:44px;height:150px;display:none;border:4px solid #111;border-radius:10px;background:#fff3;box-shadow:4px 4px 0 #1118;touch-action:none;overflow:hidden;z-index:4}
 #pThrF{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#ff8a1a,#ffd23c)}#pThrV{position:absolute;left:0;right:0;top:4px;text-align:center;font:900 12px "Arial Black",system-ui;color:#fff;-webkit-text-stroke:.8px #111}
@@ -163,10 +163,10 @@ body.uied .uie{display:block!important}body.uied .uie-f{display:flex!important}b
 <canvas id="mini" width="130" height="130" title="World map (M)"></canvas><div id="cans">⛽ 0</div>
 <canvas id="compass" width="300" height="44"></canvas><div id="wp"><div id="wpA">▲</div><div id="wpD"></div></div>
 <div id="map"><canvas id="mapc"></canvas><div id="mapui"><button class="sb" id="mClose">✕ BACK</button><button class="sb" id="mZin">＋</button><button class="sb" id="mZout">－</button><button class="sb" id="mClr">CLEAR WAYPOINT</button><span id="mInfo"></span></div><div id="mList"></div></div>
-<div id="menu" role="dialog" aria-label="Menu"><nav id="mTabs"><b class="mt-t">SINE RALLY<br>UI</b>
+<div id="menu" role="dialog" aria-label="Menu"><nav id="mTabs"><b class="mt-t">SINE RALLY<br><span id="verTag">V0.1</span></b>
 <button class="mtab" data-tab="drive"><i>🏁</i><em id="mtDrive" style="font-style:normal">DRIVE</em></button><button class="mtab" data-tab="vehicle"><i>🚗</i>VEHICLE</button><button class="mtab" data-tab="sound"><i>🔊</i>SOUND</button><button class="mtab" data-tab="gfx"><i>✨</i>GRAPHICS</button><button class="mtab" data-tab="hud"><i>🎮</i>CONTROLS</button><button class="mtab" data-tab="world"><i>🌍</i>WORLD</button>
 <button class="sb" id="mnClose">✕ CLOSE</button></nav>
-<section id="mBody"><div id="mHead"><h3 id="mTitle">DRIVE</h3><a id="allBuilds" href="https://leck-games.github.io/">‹ ALL BUILDS</a></div><div id="mPanes">
+<section id="mBody"><div id="mHead"><h3 id="mTitle">DRIVE</h3><a id="allBuilds" href="https://leck-games.github.io/">‹ ALL BUILDS</a><a id="versionsLink" href="https://leck-games.github.io/versions/">VERSIONS</a></div><div id="mPanes">
 <div class="mpane" data-pane="drive"><div id="mRows"></div></div>
 <div class="mpane" data-pane="vehicle"><div id="mVeh"></div><div id="mAtt"></div></div>
 <div class="mpane" data-pane="sound"><div id="mSnd"></div></div>

@@ -29,6 +29,16 @@ let fails = 0; const ok = (k, v, info) => { if (!v) fails++; console.log((v ? 'P
   await p.keyboard.down('KeyW'); const started = await until(() => !!__st.race, 15000); await p.keyboard.up('KeyW');
   const inR = await E(id => ({ race: __st.race, msg: document.getElementById('msg').textContent, ring: __st.raceRings.rings.find(r => r.id === id) }), st.id);
   ok('driving into the ring starts the race (GO!), its ring hides while racing', started && inR.ring && !inR.ring.visible, inR);
+  // ---- 2b. checkpoint toast: compact pill under the compass, short text, fades after ~1.2 s
+  await E(() => { const c = __st.cps[1]; __st.veh.p.x = c.x; __st.veh.p.z = c.z; }); const gotCp = await until(() => /^CP 1\/7 · /.test(document.getElementById('msg').textContent), 3000);
+  const toast = await E(() => { const m = document.getElementById('msg'), r = m.getBoundingClientRect(), cb = document.getElementById('compass').getBoundingClientRect(), s = getComputedStyle(m);
+    return { text: m.textContent, cls: m.className, fs: parseFloat(s.fontSize), rect: [r.left, r.top, r.width, r.height].map(Math.round), below: r.top >= cb.bottom - 1, cx: Math.round(r.left + r.width / 2) }; });
+  ok('checkpoint toast: compact pill top-centre below compass, short text', gotCp && toast.fs <= 17 && toast.rect[3] <= 30 && toast.rect[2] <= 200 && toast.below && toast.rect[1] + toast.rect[3] < 110 && Math.abs(toast.cx - 422) < 4, toast);
+  await sleep(1700); const gone = await E(() => document.getElementById('msg').textContent === '' && getComputedStyle(document.getElementById('msg')).display === 'none');
+  ok('checkpoint toast gone after ~1.2 s', gone);
+  await E(() => { __st.msg('🏁 NEW BEST 1:02.30', 'big', 'fast'); }); await sleep(250);
+  const big = await E(() => { const r = document.getElementById('msg').getBoundingClientRect(); return { fs: parseFloat(getComputedStyle(document.getElementById('msg')).fontSize), h: Math.round(r.height), w: Math.round(r.width), top: Math.round(r.top) }; });
+  ok('finish toast modest (≤ 20px, ≤ 36px tall, top area)', big.fs <= 20 && big.h <= 36 && big.top < 110, big);
   // ---- 3. compass: only markers inside the camera's horizontal view; flips when the camera turns around
   const far = await E(() => { const t = __st.nearTrack(__st.x, __st.z), s = __st.trackPoint(t, 0), a = 0.9; const x = s[0] - Math.sin(a) * 420, z = s[1] - Math.cos(a) * 420; __st.teleport(x, z, a); return { id: t.id, x, z, a }; });
   await sleep(3500); await p.screenshot({ path: SH + 'race_ring_far.png' });
@@ -53,7 +63,7 @@ let fails = 0; const ok = (k, v, info) => { if (!v) fails++; console.log((v ? 'P
     row.click(); const off = getComputedStyle(document.getElementById('compass')).display === 'none' && !__st.compassOn; __st.setCompass(true); return { found: true, off, on: getComputedStyle(document.getElementById('compass')).display !== 'none' }; });
   await E(() => __st.openMenu(false));
   ok('HUD tab: COMPASS On/Off toggle works', tg.found && tg.off && tg.on, tg);
-  const ue = await E(() => { __st.uied.openEd(); const h = [...document.querySelectorAll('[data-uid], .uie-handle, .uieh')].map(e => e.dataset.uid || e.textContent); const has = document.getElementById('compass').classList.contains('uie'); __st.uied.close(); return { has, h: h.filter(x => /COMPASS|compass/.test(x)).length }; });
+  const ue = await E(() => { __st.uied.openEd(); const h = [...document.querySelectorAll('[data-uid], .uie-handle, .uieh')].map(e => e.dataset.uid || e.textContent); const has = document.getElementById('compass').classList.contains('uie') && document.getElementById('msg').classList.contains('uie') && document.getElementById('msg').textContent.length > 0; __st.uied.close(); return { has, h: h.filter(x => /COMPASS|compass/.test(x)).length }; });
   const edOpen = await E(() => __st.uied.open); ok('compass registered with the HUD layout editor (editor closes again)', ue.has && !edOpen, ue);
   // ---- plane: compass + pillar visible from the air
   await E(f => { __st.setCraft('plane', 'cub', 'air'); }, far); await sleep(1500);

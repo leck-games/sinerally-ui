@@ -303,16 +303,23 @@ function compassMarkers() { const m = [], px = veh.p.x, pz = veh.p.z;
   for (const v of vNear) m.push({ kind: 'vista', id: v.key, x: v.x, z: v.z, found: !!vFound[v.key] });
   cans.map(c => [Math.hypot(c.x - px, c.z - pz), c]).filter(a => a[0] < 400).sort((a, b) => a[0] - b[0]).slice(0, 4).forEach(([, c]) => m.push({ kind: 'fuel', id: c.key, x: c.x, z: c.z }));
   return m; }
-let msgT = 0; function msg(s) { $('msg').textContent = s; $('msg').classList.remove('pop'); void $('msg').offsetWidth; $('msg').classList.add('pop'); msgT = 2; }
+// HUD toast: a compact pill under the compass. kind 'race' (checkpoint splits) 1.2 s, 'big' (GO / lap / best) 1.6 s, info 1.5 s.
+// Fade in/out is opacity-only (CSS), so a scale set in the HUD layout editor (transform) is never overridden.
+let msgT = 0; const MSG_DUR = { race: 1.2, big: 1.6, info: 1.5 };
+function msg(s, kind = 'info', cls = '') { const m = $('msg'), d = MSG_DUR[kind] || 1.5; m.textContent = s; m.classList.remove('show', 't-race', 't-big', 't-info', 'fast', 'slow'); m.classList.add('t-' + kind); if (cls) m.classList.add(cls); // keep the layout editor's uie / uie-h classes m.style.setProperty('--dur', d + 's');
+  void m.offsetWidth; m.classList.add('show'); msgT = performance.now() + d * 1000; } // wall-clock, matches the CSS fade even when frames are slow
+const splitsBest = JSON.parse(localStorage.getItem('sinerally_splits') || '{}');
+const fmtD = d => (d < 0 ? '−' : '+') + Math.abs(d).toFixed(1) + 's';
 const fmt = t => (t / 60 | 0) + ':' + (t % 60).toFixed(2).padStart(5, '0');
 function raceUpdate(dt) {
   if (craft === 'plane') { race = null; document.body.classList.remove('racing'); return; } // races are a car thing: no race bar / RACE ABANDONED in the air
   const px = veh.p.x, pz = veh.p.z, t = nearTrack(px, pz); if (t !== curTrack) { buildGates(t); race = null; }
   const nr = i => Math.hypot(px - cps[i].x, pz - cps[i].z) < 13;
-  if (!race) { if (nr(0)) { race = { t: 0, next: 1 }; msg('GO!'); } }
+  if (!race) { if (nr(0)) { race = { t: 0, next: 1, sp: [] }; msg('GO!', 'big'); } }
   else { race.t += dt;
-    if (race.next < NCP && nr(race.next)) { race.next++; msg('CHECKPOINT ' + (race.next - 1) + '/' + (NCP - 1)); }
-    else if (race.next === NCP && nr(0)) { const b = best[t.id]; if (!b || race.t < b) { best[t.id] = race.t; localStorage.setItem('sinerally_best', JSON.stringify(best)); msg('NEW BEST ' + fmt(race.t)); } else msg('LAP ' + fmt(race.t)); race = { t: 0, next: 1 }; }
+    if (race.next < NCP && nr(race.next)) { race.next++; const k = race.next - 1, bs = splitsBest[t.id] && splitsBest[t.id][k - 1]; race.sp[k - 1] = race.t;
+      const dlt = bs != null ? race.t - bs : null; msg('CP ' + k + '/' + (NCP - 1) + ' · ' + (dlt != null ? fmtD(dlt) : fmt(race.t)), 'race', dlt == null ? '' : dlt < 0 ? 'fast' : 'slow'); }
+    else if (race.next === NCP && nr(0)) { const b = best[t.id]; if (!b || race.t < b) { best[t.id] = race.t; localStorage.setItem('sinerally_best', JSON.stringify(best)); splitsBest[t.id] = race.sp.slice(); localStorage.setItem('sinerally_splits', JSON.stringify(splitsBest)); msg('🏁 NEW BEST ' + fmt(race.t), 'big', 'fast'); } else msg('🏁 LAP ' + fmt(race.t) + ' · ' + fmtD(race.t - b), 'big', 'slow'); race = { t: 0, next: 1, sp: [] }; }
     if (Math.hypot(px - t.cx, pz - t.cz) > t.R * 2.2) { race = null; msg('RACE ABANDONED'); } }
   propMat.uniforms.uDone.value = race ? race.next - 1 : 0;
   const b = best[t.id];
@@ -869,7 +876,7 @@ function frame(now) {
   $('air').textContent = veh.air > 0.5 ? 'AIR ' + veh.air.toFixed(1) + 's!' : '';
   $('carinfo').textContent = (veh.damage >= 1 ? 'DMG ' + veh.damage.toFixed(0) + '%  ' : '') + (veh.cargo.capacity ? 'LOGS ' + veh.cargo.logs + '/' + veh.cargo.capacity : '');
   { const show = veh.cargo.capacity > 0 && veh.cargo.logs > 0; if (show !== unlShown) { unlShown = show; $('bUnl').style.display = show ? 'block' : 'none'; } if (show) $('bUnl').textContent = 'UNLOAD ' + veh.cargo.logs; } }
-  if (msgT > 0 && (msgT -= dt) <= 0) $('msg').textContent = '';
+  if (msgT > 0 && performance.now() >= msgT) { msgT = 0; $('msg').textContent = ''; $('msg').classList.remove('show'); }
   raceStarts(false); RR.update(dt, camera, race && curTrack ? curTrack.id : null); if (compassOn) { camera.updateMatrixWorld(); compass.update(camera, veh.p.x, veh.p.z, compassMarkers()); }
   updateTelemetry(); minimap(Math.atan2(camDir.x, camDir.z)); gauge(); tickWp(Math.atan2(camDir.x, camDir.z)); updateLabels(dt); audio.frame(dt);
   if (!QS.has('nopost')) { renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postScene, postCam); }
@@ -880,7 +887,7 @@ function frame(now) {
 }
 { const qp = QS.get('plane'); if (qp || (QS.get('craft') !== 'car' && !QS.get('car') && localStorage.getItem('sinerally_craft') === 'plane')) setCraft('plane', qp || undefined, QS.get('air') ? 'air' : undefined); }
 requestAnimationFrame(frame);
-window.__st = { get veh() { return veh; }, get state() { return veh; }, rig, T, PH, bus, world, hpMap, evLog, stats, inp, W, audio, editor, TEL, scene,
+window.__st = { msg, get msgT() { return msgT ? Math.max(0, msgT - performance.now()) / 1000 : 0; }, get veh() { return veh; }, get state() { return veh; }, rig, T, PH, bus, world, hpMap, evLog, stats, inp, W, audio, editor, TEL, scene,
   get q() { return qName; }, setQ(q) { qName = q; applyQuality(); }, get x() { return veh.p.x; }, get z() { return veh.p.z; }, get y() { return veh.p.y; },
   teleport(x, z, yaw = 0) { race = null; if (craft === 'plane') { planeAirStart(x, z, yaw); return; } spawn(x, z, yaw); updateWorld(true); updateCans(true); }, toBiome(name, yaw = 0) { const p = T.findBiome(name, veh.p.x, veh.p.z); if (p) this.teleport(p.x, p.z, yaw); return p; },
   setVehicle, useVehicle, setAttachments, get vName() { return vDef.id; }, openMap, openMenu, setWp, get wx() { return wx; }, setWx(m, snap = true) { wxMode = m; applyWx(); if (snap) T.snapWeather(); }, set tod(v) { tod = v; timeMode = 'Fixed'; applyTime(); },

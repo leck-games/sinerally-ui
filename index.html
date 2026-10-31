@@ -37,7 +37,13 @@ body.ui-min #mini{width:84px;height:84px;border-width:3px}body.ui-min #corner{ri
 body.ui-none #hud,body.ui-none #mini,body.ui-none #cans,body.ui-none #wp,body.ui-none #gauge,body.ui-none #dbg,body.ui-none #labels,body.ui-none #msg,body.ui-none #bUnl{display:none!important}
 body.ui-none #joy,body.ui-none .btn{opacity:0} /* touch zones keep working invisibly */
 body.ui-none #corner{right:var(--sr);opacity:.35}
-#msg{position:fixed;top:36%;width:100%;text-align:center;font-size:44px;pointer-events:none}
+#msg{position:fixed;left:50%;top:calc(var(--st) + 50px);transform:translateX(-50%);width:max-content;max-width:min(60vw,420px);pointer-events:none;z-index:6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+ font:italic 800 var(--fs-l)/1.2 system-ui,sans-serif;color:#fff;-webkit-text-stroke:0;text-shadow:none;background:rgba(17,17,17,.8);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);border-radius:999px;padding:3px 12px;opacity:0}
+#msg:empty{display:none}#msg.show{animation:toast var(--dur,1.5s) ease-out forwards}#msg.t-big{font-size:20px;padding:4px 16px;border-color:var(--y)}
+#msg.fast{color:#7dff9a}#msg.slow{color:#ffb0a8}#msg.t-big.fast{color:#fff;background:rgba(30,110,50,.88)}
+@keyframes toast{0%{opacity:0}10%{opacity:1}78%{opacity:1}100%{opacity:0}}
+body.racing:not(.nocompass) #msg{top:calc(var(--st) + 72px)}body.nocompass #msg{top:calc(var(--st) + 6px)}body.racing.nocompass #msg{top:calc(var(--st) + 30px)}
+body.uied #msg{animation:none;opacity:1}
 .pop{animation:pop .35s ease-out}@keyframes pop{0%{transform:scale(2.2) rotate(-6deg)}100%{transform:scale(1) rotate(-3deg)}}
 #gauge{position:fixed;left:50%;bottom:calc(4px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);pointer-events:none;filter:drop-shadow(3px 3px 0 #1116)}
 @media (max-height:420px){#gauge{width:160px;height:96px}}
@@ -176,7 +182,7 @@ body.uied .uie{display:block!important}body.uied .uie-f{display:flex!important}b
 <canvas id="gauge" width="200" height="120"></canvas>
 <canvas id="pAtt" width="210" height="104"></canvas><div id="pThr"><div id="pThrF"></div><div id="pThrV">0</div></div><div id="pRud"><button class="sb" id="pRL">◀R</button><button class="sb" id="pRR">R▶</button></div>
 <button class="sb" id="bUnl">UNLOAD</button>
-<div id="labels"></div><div id="msg" class="ink"></div><div id="rot">ROTATE TO LANDSCAPE ↻</div>
+<div id="labels"></div><div id="msg"></div><div id="rot">ROTATE TO LANDSCAPE ↻</div>
 <script type="importmap">{"imports":{"three":"./js/three.module.js"}}</script>
 <script type="module" src="js/main.js"></script>
 </body></html>

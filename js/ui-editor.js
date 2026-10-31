@@ -7,13 +7,13 @@ export const LAYOUT_VERSION = 2; // v2 (redesign): the top bar + UI/ARC corner b
 const KEY = 'srui_layout', SLOT = n => 'srui_slot_' + n;
 // [id, label, kind] kind: 'm' movable, 's' sub-button of the top bar (hide/opacity only); flags: e = essential (never hidden)
 export const ELEMENTS = [
-  ['spdgrp', 'SPEEDO', 'm'], ['race', 'RACE', 'm'], ['mini', 'MINIMAP', 'm'], ['cans', 'FUEL', 'm'], ['wp', 'WAYPOINT', 'm'], ['compass', 'COMPASS', 'm'],
+  ['spdgrp', 'SPEEDO', 'm'], ['race', 'RACE', 'm'], ['mini', 'MINIMAP', 'm'], ['cans', 'FUEL', 'm'], ['wp', 'WAYPOINT', 'm'], ['compass', 'COMPASS', 'm'], ['msg', 'MESSAGES', 'm'],
   ['corner', '☰ ⚙ MENU + QUICK', 'm', 'e'],
   ['dbg', 'DEBUG', 'm'], ['gauge', 'GAUGE+TEMP', 'm'], ['joy', 'JOYSTICK', 'm'], ['bBst', 'BOOST', 'm'], ['bDrf', 'DRIFT', 'm'],
   ['bGas', 'GAS', 'm'], ['bBrk', 'BRAKE', 'm'], ['bUnl', 'UNLOAD', 'm'],
   ['pAtt', '✈ FLIGHT HUD', 'm'], ['pThr', '✈ THROTTLE', 'm'], ['pRud', '✈ RUDDER', 'm']]; // plane HUD (shown in plane mode; always editable here)
 const META = Object.fromEntries(ELEMENTS.map(([id, label, kind, f]) => [id, { id, label, kind, ess: f === 'e', flex: id === 'corner' || /^(b(Gas|Brk|Bst|Drf)|pRud)$/.test(id) }]));
-const NOTX = new Set(['gauge', 'wp', 'race', 'compass']); // their CSS centres them with translateX(-50%): dropped once they are placed explicitly
+const NOTX = new Set(['gauge', 'wp', 'race', 'compass', 'msg']); // their CSS centres them with translateX(-50%): dropped once they are placed explicitly
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), r1 = v => Math.round(v * 100) / 100;
 const blank = () => ({ v: LAYOUT_VERSION, g: { o: 1, s: 1 }, snap: true, flip: false, el: {} });
 export const PRESETS = {
@@ -109,7 +109,7 @@ export function createUiEditor({ onOpenChange = () => { }, onUiRestore = () => {
   }
   const forceShow = on => { document.body.classList.toggle('uied', on); };
   // ---------- edit mode ----------
-  const PH = { dbg: 'FPS · DEBUG' }; // placeholder text for elements that are empty while driving
+  const PH = { dbg: 'FPS · DEBUG', msg: 'CP 3/7 · +0.4s' }; // placeholder text for elements that are empty while driving
   function openEd() {
     if (open) return; open = true; onOpenChange(true);
     document.body.classList.remove('ui-min', 'ui-none'); forceShow(true);

@@ -120,9 +120,9 @@ export function waterMat({ far = false, uNear = null } = {}) { // far: engine fa
 // ---------------- objects (vertex coloured, optional instancing, wind, unlit, hull) ----------------
 export function objMat({ wind = 0, unlit = false, hull = 0, gate = false, hatch = 1, tint = null } = {}) { // tint: flat colour instead of the vertex colour (physics attachments)
   const defs = {}; if (unlit) defs.UNLIT = 1; if (hull) defs.HULL = 1; if (gate) defs.GATE = 1; if (tint) defs.TINT = 1;
-  const m = new THREE.ShaderMaterial({ uniforms: { ...U, uWind: { value: wind }, uHull: { value: hull }, uDone: { value: 0 }, uHK: { value: hatch }, uTint: { value: new THREE.Color(tint || 0xffffff) } }, defines: defs, vertexColors: true,
+  const m = new THREE.ShaderMaterial({ uniforms: { ...U, uWind: { value: wind }, uHull: { value: hull }, uDone: { value: 0 }, uNext: { value: -1 }, uHK: { value: hatch }, uTint: { value: new THREE.Color(tint || 0xffffff) } }, defines: defs, vertexColors: true,
     side: hull ? THREE.BackSide : THREE.FrontSide,
-    vertexShader: `uniform float uWind, uHull, uTime, uDone; uniform vec3 uTint; attribute float cp; varying vec3 vW; varying vec3 vN; varying vec3 vC;
+    vertexShader: `uniform float uWind, uHull, uTime, uDone, uNext; uniform vec3 uTint; attribute float cp; varying vec3 vW; varying vec3 vN; varying vec3 vC;
       void main(){
         mat4 m = modelMatrix;
         #ifdef USE_INSTANCING
@@ -142,7 +142,7 @@ export function objMat({ wind = 0, unlit = false, hull = 0, gate = false, hatch 
           vC = uTint;
         #endif
         #ifdef GATE
-          if (cp > 0.5 && cp < uDone + 0.5) vC = vec3(.25,.85,.35);
+          if (cp > 0.5 && cp < uDone + 0.5) vC = vec3(.25,.85,.35); else if (uNext > 0.5 && abs(cp - uNext) < 0.5) vC = mix(vC, vec3(1.,.97,.75), .25 + .2 * sin(uTime * 5.));
         #endif
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,

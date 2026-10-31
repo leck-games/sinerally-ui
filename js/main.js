@@ -298,8 +298,8 @@ function setCompass(on) { compassOn = !!on; localStorage.setItem('sinerally_comp
 function compassMarkers() { const m = [], px = veh.p.x, pz = veh.p.z;
   for (const s of starts) if (!(race && curTrack && s.id === curTrack.id)) m.push({ kind: 'race', id: s.id, x: s.x, z: s.z });
   for (const a of W.AF) m.push({ kind: 'air', id: a.id || a.name || (a.x | 0) + ',' + (a.z | 0), x: a.x, z: a.z });
-  if (wp) m.push({ kind: 'wp', id: 'wp', x: wp.x, z: wp.z });
-  if (race && cps.length) { const c = cps[race.next % NCP]; m.push({ kind: 'cp', id: 'cp' + race.next, x: c.x, z: c.z }); }
+  if (wp) m.push({ kind: 'wp', id: 'wp', x: wp.x, z: wp.z, pin: true }); // pinned: the big on-screen waypoint arrow is folded into the compass
+  if (race && cps.length) { const c = cps[race.next % NCP]; m.push({ kind: 'cp', id: 'cp' + race.next, x: c.x, z: c.z, pin: true, label: race.next === NCP ? 'FINISH' : 'CP' + race.next }); }
   for (const v of vNear) m.push({ kind: 'vista', id: v.key, x: v.x, z: v.z, found: !!vFound[v.key] });
   cans.map(c => [Math.hypot(c.x - px, c.z - pz), c]).filter(a => a[0] < 400).sort((a, b) => a[0] - b[0]).slice(0, 4).forEach(([, c]) => m.push({ kind: 'fuel', id: c.key, x: c.x, z: c.z }));
   return m; }
@@ -321,7 +321,7 @@ function raceUpdate(dt) {
       const dlt = bs != null ? race.t - bs : null; msg('CP ' + k + '/' + (NCP - 1) + ' · ' + (dlt != null ? fmtD(dlt) : fmt(race.t)), 'race', dlt == null ? '' : dlt < 0 ? 'fast' : 'slow'); }
     else if (race.next === NCP && nr(0)) { const b = best[t.id]; if (!b || race.t < b) { best[t.id] = race.t; localStorage.setItem('sinerally_best', JSON.stringify(best)); splitsBest[t.id] = race.sp.slice(); localStorage.setItem('sinerally_splits', JSON.stringify(splitsBest)); msg('🏁 NEW BEST ' + fmt(race.t), 'big', 'fast'); } else msg('🏁 LAP ' + fmt(race.t) + ' · ' + fmtD(race.t - b), 'big', 'slow'); race = { t: 0, next: 1, sp: [] }; }
     if (Math.hypot(px - t.cx, pz - t.cz) > t.R * 2.2) { race = null; msg('RACE ABANDONED'); } }
-  propMat.uniforms.uDone.value = race ? race.next - 1 : 0;
+  propMat.uniforms.uDone.value = race ? race.next - 1 : 0; propMat.uniforms.uNext.value = race && race.next < NCP ? race.next : -1; // subtle pulse on the next gate's banner
   const b = best[t.id];
   const near = !race && Math.hypot(px - cps[0].x, pz - cps[0].z) < 45; document.body.classList.toggle('racing', !!race || near); // race bar only in a race (or at the start gate)
   $('race').innerHTML = race ? `LAP ${fmt(race.t)} · CP ${race.next - 1}/${NCP - 1}` + (b ? `<br><small>BEST ${fmt(b)}</small>` : '') : near ? `🏁 DRIVE INTO THE RING TO RACE` + (b ? `<br><small>TRACK ${t.id} · BEST ${fmt(b)}</small>` : '') : '';
@@ -487,7 +487,7 @@ function tickVistas() {
 let wp = JSON.parse(localStorage.getItem('sinerally_wp') || 'null');
 function setWp(p) { wp = p; localStorage.setItem('sinerally_wp', JSON.stringify(p)); }
 function tickWp(yawCam) {
-  const el = $('wp'); if (!wp) { el.style.display = 'none'; return; }
+  const el = $('wp'); document.body.classList.toggle('haswp', !!wp); if (!wp) { el.style.display = 'none'; return; }
   const dx = wp.x - veh.p.x, dz = wp.z - veh.p.z, d = Math.hypot(dx, dz); if (d < 25) { setWp(null); msg('WAYPOINT REACHED'); return; }
   const rel = Math.atan2(dx, dz) - yawCam; el.style.display = 'block';
   $('wpA').style.transform = `rotate(${-rel}rad)`; $('wpD').textContent = d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
@@ -889,7 +889,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 window.__st = { msg, get msgT() { return msgT ? Math.max(0, msgT - performance.now()) / 1000 : 0; }, get veh() { return veh; }, get state() { return veh; }, rig, T, PH, bus, world, hpMap, evLog, stats, inp, W, audio, editor, TEL, scene,
   get q() { return qName; }, setQ(q) { qName = q; applyQuality(); }, get x() { return veh.p.x; }, get z() { return veh.p.z; }, get y() { return veh.p.y; },
-  teleport(x, z, yaw = 0) { race = null; if (craft === 'plane') { planeAirStart(x, z, yaw); return; } spawn(x, z, yaw); updateWorld(true); updateCans(true); }, toBiome(name, yaw = 0) { const p = T.findBiome(name, veh.p.x, veh.p.z); if (p) this.teleport(p.x, p.z, yaw); return p; },
+  place(x, z, yaw = 0) { spawn(x, z, yaw); }, /* car move that keeps the running race (tests) */ teleport(x, z, yaw = 0) { race = null; if (craft === 'plane') { planeAirStart(x, z, yaw); return; } spawn(x, z, yaw); updateWorld(true); updateCans(true); }, toBiome(name, yaw = 0) { const p = T.findBiome(name, veh.p.x, veh.p.z); if (p) this.teleport(p.x, p.z, yaw); return p; },
   setVehicle, useVehicle, setAttachments, get vName() { return vDef.id; }, openMap, openMenu, setWp, get wx() { return wx; }, setWx(m, snap = true) { wxMode = m; applyWx(); if (snap) T.snapWeather(); }, set tod(v) { tod = v; timeMode = 'Fixed'; applyTime(); },
   get dynS() { return dynS; }, get craft() { return craft; }, setCraft, get plane() { return pl; }, get planeDef() { return plDef; }, PLANES, planeToRunway, airStart: planeAirStart, pickField, get planeCtl() { return plAuto; }, set planeCtl(v) { plAuto = v; }, get pin() { return pin; }, get throttle() { return thrLever; }, set throttle(v) { thrLever = v; }, get afx() { return AFX; }, get rinfo() { const r = renderer.info.render; return { tris: r.triangles, calls: r.calls, pr: renderer.getPixelRatio(), grass: grassMesh ? grassMesh.geometry.instanceCount : 0, det: U.uDet.value, sh: vshadow ? vshadow.size : 0, far: camera.far, qLoad, road: T.roadStats }; }, get QUAL() { return QUAL; }, vshadow, get camera() { return camera; }, get labels() { return labTrees; }, get handling() { return hMode; }, setHandling, get ui() { return uiMode; }, setUi, cycleUi, get uied() { return uied; }, rockGone, get rocks() { return colliders; }, collideRocks,
   raceRings: RR, get starts() { return starts.map(s => ({ id: s.id, x: s.x, z: s.z })); }, get compass() { return compass.state; }, setCompass, get compassOn() { return compassOn; },

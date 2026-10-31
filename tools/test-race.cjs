@@ -39,6 +39,21 @@ let fails = 0; const ok = (k, v, info) => { if (!v) fails++; console.log((v ? 'P
   await E(() => { __st.msg('🏁 NEW BEST 1:02.30', 'big', 'fast'); }); await sleep(250);
   const big = await E(() => { const r = document.getElementById('msg').getBoundingClientRect(); return { fs: parseFloat(getComputedStyle(document.getElementById('msg')).fontSize), h: Math.round(r.height), w: Math.round(r.width), top: Math.round(r.top) }; });
   ok('finish toast modest (≤ 20px, ≤ 36px tall, top area)', big.fs <= 20 && big.h <= 36 && big.top < 110, big);
+  // ---- 2c. next checkpoint lives in the compass (no separate on-screen marker): badge 'CP2 · 141m', clamped to the edge with ◀/▶ when behind
+  const placeTh = (m) => E(m => { const t = __st.curTrack, th = 1.45 / 8 * Math.PI * 2, s = __st.trackPoint(t, th), q = __st.trackPoint(t, th + 0.004), o = __st.trackPoint(t, th - 0.004);
+    __st.place(s[0], s[1], Math.atan2(q[0] - o[0], q[1] - o[1]) + (m ? Math.PI : 0)); }, m);
+  const pinOf = () => E(() => { const c = __st.compass, cb = document.getElementById('compass').getBoundingClientRect(); return { race: !!__st.race, next: __st.race && __st.race.next, pins: c.pins, w: Math.round(cb.width) }; });
+  await placeTh(false); await sleep(1500); const pa = await pinOf(); const cpA = pa.pins && pa.pins.find(m => m.kind === 'cp');
+  ok('compass: next checkpoint pinned with label + distance, in view (no edge arrow)', pa.race && cpA && cpA.label === 'CP' + pa.next && cpA.shown && cpA.edge === null && cpA.d > 0, pa);
+  await placeTh(true); await sleep(1500); const pb = await pinOf(); const cpB = pb.pins && pb.pins.find(m => m.kind === 'cp');
+  ok('compass: checkpoint behind -> clamped to the compass edge with an arrow, never lost', pb.race && cpB && cpB.shown && /^[LR]$/.test(cpB.edge) && cpB.x > pb.w * 0.1 && cpB.x < pb.w * 0.9 && Math.abs(cpB.rel) > 40, pb);
+  await placeTh(false); await sleep(1500); const wq = await E(async () => { const w = __st.trackPoint(__st.curTrack, 1.45 / 8 * Math.PI * 2 + 0.9); __st.setWp({ x: w[0], z: w[1] }); await new Promise(r => setTimeout(r, 800));
+    const wpEl = document.getElementById('wp'), on = { wpDisp: getComputedStyle(wpEl).display, pin: (__st.compass.pins || []).find(m => m.kind === 'wp') };
+    document.body.classList.add('nocompass'); __st.msg('CP 1/7 · −0.4s', 'race'); await new Promise(r => setTimeout(r, 300));
+    const a = wpEl.getBoundingClientRect(), b = document.getElementById('msg').getBoundingClientRect(), off = { wpDisp: getComputedStyle(wpEl).display, wp: [a.top, a.bottom].map(Math.round), msg: [b.top, b.bottom].map(Math.round) };
+    document.body.classList.remove('nocompass'); __st.setWp(null); return { on, off }; });
+  ok('waypoint: big on-screen arrow hidden while the compass is on, shown as a compass pin instead', wq.on.wpDisp === 'none' && wq.on.pin && wq.on.pin.shown, wq.on);
+  ok('compass off: message pill no longer overlaps the waypoint arrow/label', wq.off.wpDisp === 'block' && wq.off.msg[0] >= wq.off.wp[1], wq.off);
   // ---- 3. compass: only markers inside the camera's horizontal view; flips when the camera turns around
   const far = await E(() => { const t = __st.nearTrack(__st.x, __st.z), s = __st.trackPoint(t, 0), a = 0.9; const x = s[0] - Math.sin(a) * 420, z = s[1] - Math.cos(a) * 420; __st.teleport(x, z, a); return { id: t.id, x, z, a }; });
   await sleep(3500); await p.screenshot({ path: SH + 'race_ring_far.png' });

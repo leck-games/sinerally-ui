@@ -232,6 +232,7 @@ One build = the engine pass (from leck-games/sinerally-engine) rendered entirely
 
 - **Race-start rings.** Every race start has a glowing comic-style ring on the ground. It has a pulse, marching chevrons and an additive halo, plus a tall light pillar that you can see from far away and from planes. Distant pillars are pulled inside the camera's far plane, so they never get clipped. Drive into the ring to start the race. The ring of the race you are running is hidden. (`js/race-ring.js`)
 - **Compass.** A FUEL-style 360° compass strip runs along the top of the screen, with N/E/S/W ticks. It tracks race starts, airfields, your waypoint, the next checkpoint, vistas and nearby fuel cans, each shown with an icon and a distance. Only markers inside the camera's horizontal view are drawn, and they fade out at the edges. It works in the car and in the plane. You can move, resize or hide it in the HUD layout editor (`COMPASS`) and switch it on or off in **Menu → HUD → COMPASS**. (`js/compass.js`)
+- **Next checkpoint & waypoint in the compass.** There is no separate on-screen distance marker any more. The next checkpoint is pinned in the compass as a yellow badge such as `CP3 · 240m` (or `FINISH`), and a waypoint gets a red badge. When either one is outside the view, it is clamped to the compass edge with ◀/▶, so it is never lost. The next gate's banner pulses softly in 3D. With the compass off, the old waypoint arrow comes back, and the message pill moves below it.
   - Heading convention: the map has north at the top (+z) and east at −x, so bearing = `atan2(−dx, dz)`. The plane HUD heading uses the same convention.
 - **Checkpoint gates.** Gates face along the track: the cross-bar is perpendicular to the road's tangent. Each post stands on its own ground height. Banners follow half of the road's cross-slope, up to 10°.
 - **Tests.** `node tools/test-race.cjs [port]` checks four things:
@@ -240,4 +241,4 @@ One build = the engine pass (from leck-games/sinerally-engine) rendered entirely
   - the compass shows only in-view markers, in the car and in the plane
   - every gate of every race is within 10° of the road tangent
 
-  Screenshots are saved to `shots/race_ring_*.png`, `compass_*.png` and `checkpoints_aligned.png`.
+  Screenshots are saved to `shots/race_ring_*.png`, `compass_*.png`, `cpdist_*.png` and `checkpoints_aligned.png`.

@@ -227,3 +227,17 @@ One build = the engine pass (from leck-games/sinerally-engine) rendered entirely
   Low = pixel ratio 1, no post pass, inverted-hull outlines; Med (mobile default) = 1.25, post pass;
   High (desktop default) = 1.5, post pass, longer scenery radius. ~17 draw calls.
 - Tracks now blend into the terrain with embankments that widen with cut depth (no sheer canyon walls).
+
+## Race rings, compass & checkpoints
+
+- **Race-start rings.** Every race start has a glowing comic-style ring on the ground. It has a pulse, marching chevrons and an additive halo, plus a tall light pillar that you can see from far away and from planes. Distant pillars are pulled inside the camera's far plane, so they never get clipped. Drive into the ring to start the race. The ring of the race you are running is hidden. (`js/race-ring.js`)
+- **Compass.** A FUEL-style 360° compass strip runs along the top of the screen, with N/E/S/W ticks. It tracks race starts, airfields, your waypoint, the next checkpoint, vistas and nearby fuel cans, each shown with an icon and a distance. Only markers inside the camera's horizontal view are drawn, and they fade out at the edges. It works in the car and in the plane. You can move, resize or hide it in the HUD layout editor (`COMPASS`) and switch it on or off in **Menu → HUD → COMPASS**. (`js/compass.js`)
+  - Heading convention: the map has north at the top (+z) and east at −x, so bearing = `atan2(−dx, dz)`. The plane HUD heading uses the same convention.
+- **Checkpoint gates.** Gates face along the track: the cross-bar is perpendicular to the road's tangent. Each post stands on its own ground height. Banners follow half of the road's cross-slope, up to 10°.
+- **Tests.** `node tools/test-race.cjs [port]` checks four things:
+  - a ring sits at every start
+  - entering a ring starts the race
+  - the compass shows only in-view markers, in the car and in the plane
+  - every gate of every race is within 10° of the road tangent
+
+  Screenshots are saved to `shots/race_ring_*.png`, `compass_*.png` and `checkpoints_aligned.png`.

@@ -6,7 +6,7 @@ let puppeteer; try { puppeteer = require('puppeteer-core'); } catch (e) { puppet
 const SH = require('path').join(__dirname, '..', 'shots') + '/', sleep = ms => new Promise(r => setTimeout(r, ms));
 const PORT = process.argv[2] || process.env.PORT || 18941, URL = `http://127.0.0.1:${PORT}/?q=low&dyn=0&wx=clear&tod=0.4`;
 let fails = 0; const ok = (k, v, info) => { if (!v) fails++; console.log((v ? 'PASS ' : 'FAIL ') + k, info !== undefined ? JSON.stringify(info).slice(0, 600) : ''); };
-const HUD = ['spdgrp', 'race', 'mini', 'cans', 'wp', 'corner', 'dbg', 'gauge', 'joy', 'bBst', 'bDrf', 'bGas', 'bBrk', 'bUnl', 'pAtt', 'pThr', 'pRud'];
+const HUD = ['spdgrp', 'compass', 'race', 'mini', 'cans', 'wp', 'corner', 'dbg', 'gauge', 'joy', 'bBst', 'bDrf', 'bGas', 'bBrk', 'bUnl', 'pAtt', 'pThr', 'pRud'];
 (async () => {
   const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const p = await b.newPage(); await p.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });

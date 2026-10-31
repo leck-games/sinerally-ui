@@ -76,22 +76,30 @@ export function buggy() {
 }
 // ---- race furniture for one track: gates with banners, flags, tyre stacks, chevron signs ----
 export function trackProps(cps, heightFn) {
-  const parts = [];
+  // c.ang = track heading (atan2(dx, dz)); the gate's cross-bar runs along the lateral axis (cos ang, -sin ang), i.e. perpendicular
+  // to the racing line. Posts stand vertical on their own ground height; banners roll with the cross-slope (no floating posts).
+  const parts = [], gates = [];
   cps.forEach((c, i) => {
-    const y = heightFn(c.x, c.z), a = c.ang + Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
-    const at = (lx, ly, lz) => [c.x + lx * ca + lz * sa, y + ly, c.z - lx * sa + lz * ca];
+    const a = c.ang, ca = Math.cos(a), sa = Math.sin(a);
+    const xz = (lx, lz) => [c.x + lx * ca + lz * sa, c.z - lx * sa + lz * ca];
+    const gy = (lx, lz) => { const [x, z] = xz(lx, lz); return heightFn(x, z); };
+    const yc = heightFn(c.x, c.z), yl = Math.min(gy(-11, 0), yc + 1.5), yr = Math.min(gy(11, 0), yc + 1.5), ym = (yl + yr) / 2;
+    const roll = Math.max(-0.175, Math.min(0.175, Math.atan2(yr - yl, 22) * 0.5)), yAt = lx => ym + lx * Math.tan(roll); // banner follows half the cross-slope (max 10°)
+    const at = (lx, ly, lz, y0) => { const [x, z] = xz(lx, lz); return [x, (y0 ?? yAt(lx)) + ly, z]; };
     const pc = i === 0 ? 0xffffff : 0xffcf2a;
-    for (const s of [-11, 11]) { parts.push(P(box(1.1, 7.5, 1.1), 0x333340, at(s, 3.75, 0), [0, a, 0])); parts.push(P(cyl(.9, 1.1, .7, 8), 0x22222a, at(s * 1.18, .35, 0))); parts.push(P(cyl(.9, 1.1, .7, 8), 0xff3b3b, at(s * 1.18, 1.05, 0))); }
-    if (i === 0) { for (let k = 0; k < 12; k++) for (let r = 0; r < 2; r++) parts.push(P(box(1.85, .8, .3), (k + r) % 2 ? 0x111111 : 0xffffff, at(-10.2 + k * 1.85, 6.6 + r * .8, 0), [0, a, 0])); }
-    else parts.push(P(box(22, 1.6, .3), pc, at(0, 6.8, 0), [0, a, 0], [1, 1, 1], i));
-    for (const s of [-12.5, 12.5]) { parts.push(P(cyl(.08, .08, 5, 4), 0x333340, at(s, 2.5, 2))); parts.push(P(box(.05, 1, 1.6), i === 0 ? 0x2a6cff : 0xff3b3b, at(s, 4.4, 2.8), [0, a, 0])); }
-    // chevron sign halfway to next gate
-    const n = cps[(i + 1) % cps.length], mx = (c.x + n.x) / 2, mz = (c.z + n.z) / 2;
-    const dx = mx - c.x, dz = mz - c.z; // signs stand outside the curve at radius offset
+    // vertical posts stand on their own ground (sunk 1.2 m) and reach up to the banner ends
+    for (const s of [-11, 11]) { const yb = s < 0 ? yl : yr, top = yAt(s) + 7.5, hgt = top - (yb - 1.2); parts.push(P(box(1.1, hgt, 1.1), 0x333340, at(s, 0, 0, yb - 1.2 + hgt / 2), [0, a, 0])); parts.push(P(cyl(.9, 1.1, .7, 8), 0x22222a, at(s * 1.18, .35, 0, gy(s * 1.18, 0)))); parts.push(P(cyl(.9, 1.1, .7, 8), 0xff3b3b, at(s * 1.18, 1.05, 0, gy(s * 1.18, 0)))); }
+    if (i === 0) { for (let k = 0; k < 12; k++) for (let r = 0; r < 2; r++) parts.push(P(box(1.85, .8, .3), (k + r) % 2 ? 0x111111 : 0xffffff, at(-10.2 + k * 1.85, 6.6 + r * .8, 0), [0, a, roll])); }
+    else parts.push(P(box(22, 1.6, .3), pc, at(0, 6.8, 0), [0, a, roll], [1, 1, 1], i));
+    for (const s of [-12.5, 12.5]) { const y0 = gy(s, 2); parts.push(P(cyl(.08, .08, 5, 4), 0x333340, at(s, 2.5, 2, y0))); parts.push(P(box(.05, 1, 1.6), i === 0 ? 0x2a6cff : 0xff3b3b, at(s, 4.4, 2.8, y0), [0, a, 0])); }
+    gates.push({ i, x: c.x, z: c.z, ang: a, l: xz(-11, 0), r: xz(11, 0), roll });
+    // chevron sign halfway to next gate, outside the curve, facing the drivers
+    const n = cps[(i + 1) % cps.length], mx = (c.x + n.x) / 2, mz = (c.z + n.z) / 2, na = n.ang;
     const off = 14, ox = mx + Math.cos(c.ang) * off, oz = mz - Math.sin(c.ang) * off, yy = heightFn(ox, oz);
-    parts.push(P(cyl(.12, .12, 2.5, 4), 0x333340, [ox, yy + 1.25, oz])); parts.push(P(box(3, 1.2, .15), 0xffd23c, [ox, yy + 2.9, oz], [0, a, 0]));
+    const sgA = Math.atan2(Math.sin(a) + Math.sin(na), Math.cos(a) + Math.cos(na));
+    parts.push(P(cyl(.12, .12, 2.5, 4), 0x333340, [ox, yy + 1.25, oz])); parts.push(P(box(3, 1.2, .15), 0xffd23c, [ox, yy + 2.9, oz], [0, sgA, 0]));
   });
-  return merge(parts);
+  const g = merge(parts); g.userData.gates = gates; return g;
 }
 // ---- trophy truck: metres, ground y=0, wheel centres (+-1.05, .64, +1.65/-1.6) ----
 export function truck() {

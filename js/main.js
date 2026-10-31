@@ -22,6 +22,8 @@ import { melts } from './phys/attachments/index.js';
 import { PLANES, getPlane, buildPlane, createPlaneState, spawnRunway, spawnAir, stepPlane } from './plane.js'; // SineRally UI: flyable planes
 import { openPlaneSelector } from './plane-select.js';
 import { createAirfields } from './airfields.js';
+import { createRaceRings } from './race-ring.js'; // SineRally UI: glowing ring + light pillar at every race start
+import { createCompass } from './compass.js'; // SineRally UI: FUEL-style heading strip (in-view markers only)
 let audio = null; // engine sound host (created after the telemetry block)
 import { createVehicleShadow } from './vshadow.js';
 const { WATER, nearTrack, trackPoint, hash2, sample, surfaceOf, colourOf, normal, height, ground } = W;
@@ -277,12 +279,30 @@ function readInput(dt) {
 // ---------- race: comic gates/props merged per loop track ----------
 const NCP = 8, propMat = objMat({ gate: true, hatch: 0.8 }); let propMesh = null;
 let curTrack = null, race = null, cps = []; const best = JSON.parse(localStorage.getItem('sinerally_best') || '{}');
-function cpPos(t, i) { const th = i / NCP * Math.PI * 2, p = trackPoint(t, th), q = trackPoint(t, th + 0.01); return { x: p[0], z: p[1], ang: Math.atan2(q[0] - p[0], q[1] - p[1]) }; }
+function cpPos(t, i) { const th = i / NCP * Math.PI * 2, p = trackPoint(t, th), q = trackPoint(t, th + 0.004), o = trackPoint(t, th - 0.004); return { x: p[0], z: p[1], th, ang: Math.atan2(q[0] - o[0], q[1] - o[1]) }; } // heading = central-difference tangent of the loop centre-line
 function buildGates(t) {
   curTrack = t; cps = Array.from({ length: NCP }, (_, i) => cpPos(t, i));
   if (propMesh) { scene.remove(propMesh); propMesh.geometry.dispose(); }
   const g = trackProps(cps, T.heightAt); propMesh = new THREE.Mesh(g, propMat); scene.add(propMesh);
 }
+// race starts: every loop track near the player gets a pulsing ring + light pillar (drive into the ring = start, as before)
+const RR = createRaceRings({ scene, heightAt: (x, z) => T.heightAt(x, z) }); let starts = [], startsAt = [1e9, 1e9];
+function raceStarts(force, ax, az) { const px = ax ?? veh.p.x, pz = az ?? veh.p.z; if (!force && Math.hypot(px - startsAt[0], pz - startsAt[1]) < 150) return; startsAt = [px, pz];
+  const seen = new Set(); starts = [];
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const t = nearTrack(px + i * 3000, pz + j * 3000); if (seen.has(t.id)) continue; seen.add(t.id);
+    const p = trackPoint(t, 0); if (Math.abs(p[0]) > W.WORLD || Math.abs(p[1]) > W.WORLD) continue; starts.push({ id: t.id, x: p[0], z: p[1], t }); }
+  starts.sort((a, b) => Math.hypot(a.x - px, a.z - pz) - Math.hypot(b.x - px, b.z - pz)); RR.set(starts); }
+// compass (top HUD strip): race starts, airfields, waypoint, next checkpoint, vistas, nearest fuel cans — only what is inside the camera's view angle
+const compass = createCompass($('compass')); let compassOn = localStorage.getItem('sinerally_compass') !== 'off';
+function setCompass(on) { compassOn = !!on; localStorage.setItem('sinerally_compass', on ? 'on' : 'off'); document.body.classList.toggle('nocompass', !on); } setCompass(compassOn);
+function compassMarkers() { const m = [], px = veh.p.x, pz = veh.p.z;
+  for (const s of starts) if (!(race && curTrack && s.id === curTrack.id)) m.push({ kind: 'race', id: s.id, x: s.x, z: s.z });
+  for (const a of W.AF) m.push({ kind: 'air', id: a.id || a.name || (a.x | 0) + ',' + (a.z | 0), x: a.x, z: a.z });
+  if (wp) m.push({ kind: 'wp', id: 'wp', x: wp.x, z: wp.z });
+  if (race && cps.length) { const c = cps[race.next % NCP]; m.push({ kind: 'cp', id: 'cp' + race.next, x: c.x, z: c.z }); }
+  for (const v of vNear) m.push({ kind: 'vista', id: v.key, x: v.x, z: v.z, found: !!vFound[v.key] });
+  cans.map(c => [Math.hypot(c.x - px, c.z - pz), c]).filter(a => a[0] < 400).sort((a, b) => a[0] - b[0]).slice(0, 4).forEach(([, c]) => m.push({ kind: 'fuel', id: c.key, x: c.x, z: c.z }));
+  return m; }
 let msgT = 0; function msg(s) { $('msg').textContent = s; $('msg').classList.remove('pop'); void $('msg').offsetWidth; $('msg').classList.add('pop'); msgT = 2; }
 const fmt = t => (t / 60 | 0) + ':' + (t % 60).toFixed(2).padStart(5, '0');
 function raceUpdate(dt) {
@@ -297,7 +317,7 @@ function raceUpdate(dt) {
   propMat.uniforms.uDone.value = race ? race.next - 1 : 0;
   const b = best[t.id];
   const near = !race && Math.hypot(px - cps[0].x, pz - cps[0].z) < 45; document.body.classList.toggle('racing', !!race || near); // race bar only in a race (or at the start gate)
-  $('race').innerHTML = race ? `LAP ${fmt(race.t)} · CP ${race.next - 1}/${NCP - 1}` + (b ? `<br><small>BEST ${fmt(b)}</small>` : '') : near ? `🏁 DRIVE THROUGH THE GATE TO RACE` + (b ? `<br><small>TRACK ${t.id} · BEST ${fmt(b)}</small>` : '') : '';
+  $('race').innerHTML = race ? `LAP ${fmt(race.t)} · CP ${race.next - 1}/${NCP - 1}` + (b ? `<br><small>BEST ${fmt(b)}</small>` : '') : near ? `🏁 DRIVE INTO THE RING TO RACE` + (b ? `<br><small>TRACK ${t.id} · BEST ${fmt(b)}</small>` : '') : '';
 }
 // ---------- minimap (comic: inked roads, loop, start gate) ----------
 const mc = $('mini').getContext('2d'); let mapPaths = [], mapAt = [1e9, 1e9];
@@ -537,6 +557,7 @@ function buildMenu() {
   const hu = $('mHud'); hu.innerHTML = '';
   const e1 = mk('button', 'sb mbig', '✥ EDIT HUD LAYOUT'); e1.id = 'mEditUi'; e1.style.cssText = 'background:var(--o);color:#fff'; e1.onclick = () => { openMenu(false); uied.openEd(); };
   const r0 = mk('div', 'mrow'); r0.appendChild(e1); hu.appendChild(r0); hu.appendChild(mk('div', 'mnote', 'Drag, scale, hide or fade every HUD element; save presets and slots. Keyboard: U.'));
+  segRows(hu, [['COMPASS', ['On', 'Off'], () => compassOn ? 'On' : 'Off', v => setCompass(v === 'On'), 'Heading strip at the top: race starts, airfields, waypoint, vistas and fuel show only while they are in your view. Move/resize it in EDIT HUD LAYOUT.']]);
   segRows(hu, [['HUD MODE', ['Full', 'Minimal', 'None'], () => uiMode[0].toUpperCase() + uiMode.slice(1), v => setUi(v.toLowerCase()), 'NONE keeps only a faint ☰ ⚙ corner (and the touch controls). Keyboard: I.'],
     ['TILT STEERING', ['Off', 'On'], () => tilt ? 'On' : 'Off', v => { if ((v === 'On') !== tilt) $('tTilt').onclick(); }]]);
   hu.appendChild(mk('div', 'msec', 'KEYBOARD'));
@@ -733,7 +754,7 @@ function planeHud(dt) {
   ink('ALT', Wd - 26, 22, '900 10px "Arial Black",system-ui'); ink(String(Math.round(pl.alt)), Wd - 26, 44, 'italic 900 19px "Arial Black",system-ui', '#ffd23c');
   ink('AGL ' + Math.round(pl.agl), Wd - 26, 60, '900 10px "Arial Black",system-ui');
   ink((pl.vs >= 0 ? '▲' : '▼') + Math.abs(pl.vs).toFixed(1), 26, 60, '900 11px "Arial Black",system-ui', pl.vs < -8 && pl.agl < 60 ? '#ff5030' : '#fff');
-  ink(String(Math.round(((pl.hdg ?? Math.atan2(pl.fwd.x, pl.fwd.z) * 57.3) + 360) % 360)).padStart(3, '0') + '°', cx, 11, '900 10px "Arial Black",system-ui');
+  ink(String(Math.round((720 - (pl.hdg ?? Math.atan2(pl.fwd.x, pl.fwd.z) * 57.3)) % 360) % 360).padStart(3, '0') + '°', cx, 11, '900 10px "Arial Black",system-ui');
   ink('THR ' + Math.round(pl.thrA * 100) + '%', 26, 84, '900 10px "Arial Black",system-ui');
   const warn = pl.crashed ? '' : pl.stall ? 'STALL' : (pl.agl < 40 && pl.vs < -10 ? 'PULL UP' : '');
   if (warn && (tFrame * 3 % 1) < 0.6) ink(warn, cx, Hd - 4, 'italic 900 15px "Arial Black",system-ui', '#ff5030');
@@ -849,6 +870,7 @@ function frame(now) {
   $('carinfo').textContent = (veh.damage >= 1 ? 'DMG ' + veh.damage.toFixed(0) + '%  ' : '') + (veh.cargo.capacity ? 'LOGS ' + veh.cargo.logs + '/' + veh.cargo.capacity : '');
   { const show = veh.cargo.capacity > 0 && veh.cargo.logs > 0; if (show !== unlShown) { unlShown = show; $('bUnl').style.display = show ? 'block' : 'none'; } if (show) $('bUnl').textContent = 'UNLOAD ' + veh.cargo.logs; } }
   if (msgT > 0 && (msgT -= dt) <= 0) $('msg').textContent = '';
+  raceStarts(false); RR.update(dt, camera, race && curTrack ? curTrack.id : null); if (compassOn) { camera.updateMatrixWorld(); compass.update(camera, veh.p.x, veh.p.z, compassMarkers()); }
   updateTelemetry(); minimap(Math.atan2(camDir.x, camDir.z)); gauge(); tickWp(Math.atan2(camDir.x, camDir.z)); updateLabels(dt); audio.frame(dt);
   if (!QS.has('nopost')) { renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null); renderer.render(postScene, postCam); }
   else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
@@ -860,6 +882,9 @@ function frame(now) {
 requestAnimationFrame(frame);
 window.__st = { get veh() { return veh; }, get state() { return veh; }, rig, T, PH, bus, world, hpMap, evLog, stats, inp, W, audio, editor, TEL, scene,
   get q() { return qName; }, setQ(q) { qName = q; applyQuality(); }, get x() { return veh.p.x; }, get z() { return veh.p.z; }, get y() { return veh.p.y; },
-  teleport(x, z, yaw = 0) { if (craft === 'plane') { planeAirStart(x, z, yaw); return; } spawn(x, z, yaw); updateWorld(true); updateCans(true); }, toBiome(name, yaw = 0) { const p = T.findBiome(name, veh.p.x, veh.p.z); if (p) this.teleport(p.x, p.z, yaw); return p; },
+  teleport(x, z, yaw = 0) { race = null; if (craft === 'plane') { planeAirStart(x, z, yaw); return; } spawn(x, z, yaw); updateWorld(true); updateCans(true); }, toBiome(name, yaw = 0) { const p = T.findBiome(name, veh.p.x, veh.p.z); if (p) this.teleport(p.x, p.z, yaw); return p; },
   setVehicle, useVehicle, setAttachments, get vName() { return vDef.id; }, openMap, openMenu, setWp, get wx() { return wx; }, setWx(m, snap = true) { wxMode = m; applyWx(); if (snap) T.snapWeather(); }, set tod(v) { tod = v; timeMode = 'Fixed'; applyTime(); },
-  get dynS() { return dynS; }, get craft() { return craft; }, setCraft, get plane() { return pl; }, get planeDef() { return plDef; }, PLANES, planeToRunway, airStart: planeAirStart, pickField, get planeCtl() { return plAuto; }, set planeCtl(v) { plAuto = v; }, get pin() { return pin; }, get throttle() { return thrLever; }, set throttle(v) { thrLever = v; }, get afx() { return AFX; }, get rinfo() { const r = renderer.info.render; return { tris: r.triangles, calls: r.calls, pr: renderer.getPixelRatio(), grass: grassMesh ? grassMesh.geometry.instanceCount : 0, det: U.uDet.value, sh: vshadow ? vshadow.size : 0, far: camera.far, qLoad, road: T.roadStats }; }, get QUAL() { return QUAL; }, vshadow, get camera() { return camera; }, get labels() { return labTrees; }, get handling() { return hMode; }, setHandling, get ui() { return uiMode; }, setUi, cycleUi, get uied() { return uied; }, rockGone, get rocks() { return colliders; }, collideRocks };
+  get dynS() { return dynS; }, get craft() { return craft; }, setCraft, get plane() { return pl; }, get planeDef() { return plDef; }, PLANES, planeToRunway, airStart: planeAirStart, pickField, get planeCtl() { return plAuto; }, set planeCtl(v) { plAuto = v; }, get pin() { return pin; }, get throttle() { return thrLever; }, set throttle(v) { thrLever = v; }, get afx() { return AFX; }, get rinfo() { const r = renderer.info.render; return { tris: r.triangles, calls: r.calls, pr: renderer.getPixelRatio(), grass: grassMesh ? grassMesh.geometry.instanceCount : 0, det: U.uDet.value, sh: vshadow ? vshadow.size : 0, far: camera.far, qLoad, road: T.roadStats }; }, get QUAL() { return QUAL; }, vshadow, get camera() { return camera; }, get labels() { return labTrees; }, get handling() { return hMode; }, setHandling, get ui() { return uiMode; }, setUi, cycleUi, get uied() { return uied; }, rockGone, get rocks() { return colliders; }, collideRocks,
+  raceRings: RR, get starts() { return starts.map(s => ({ id: s.id, x: s.x, z: s.z })); }, get compass() { return compass.state; }, setCompass, get compassOn() { return compassOn; },
+  get race() { return race; }, get cps() { return cps; }, get curTrack() { return curTrack; }, NCP, nearTrack, trackPoint, raceStarts,
+  gateFrames(t) { const c = Array.from({ length: NCP }, (_, i) => cpPos(t, i)), g = trackProps(c, T.heightAt), r = g.userData.gates; g.dispose(); return r; } };

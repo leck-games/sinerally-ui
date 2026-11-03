@@ -72,7 +72,7 @@ export function setMode(s, mode) { s.mode = mode === 'normal' ? 'normal' : 'arca
 export function createState(params) {
   const s = {
     P: resolveParams(params), p: V(), v: V(), q: { x: 0, y: 0, z: 0, w: 1 }, w: V(), left: V(1, 0, 0), up: V(0, 1, 0), fwd: V(0, 0, 1),
-    gear: 1, rpm: 900, shift: 0, steer: 0, air: 0, airMax: 0, nitro: 1, grounded: 0, flipT: 0, revT: 0, vy0: 0, holdT: 0, spinT: 0,
+    gear: 1, rpm: 900, shift: 0, steer: 0, air: 0, airMax: 0, nitro: 1, grounded: 0, flipT: 0, revT: 0, vy0: 0, holdT: 0, spinT: 0, gbFlatT: 0, gbV: 0, gbCap: 0, manual: false,
     tcCut: 1, slipD: 0, thr: 0, brk: 0, load: 0, boosting: false, limiter: false, time: 0,
     assist: { stab: true, tc: true }, gripMul: 1, mode: 'arcade', drift: null, ain: 0, driftT: 0, offT: 0,
     heat: { temp: 70, limT: 0, over: false, hotT: 0, cut: false },
@@ -151,12 +151,28 @@ export function step(s, inp, dt, world, ext) {
   s.thr = thr; s.brk = brk; s.load = clamp(Te / Math.max(1, engineTorque(c, s.rpm) * tqMul), -1, 1); s.boosting = nitroOn;
   if (!thr) Te = -(30 + s.rpm * 0.012) * (s.rpm > c.idle + 200 ? 1 : 0); // engine braking
   const driveTotal = Te * gr * c.eff;
-  // auto gearbox (decisions on road-speed rpm; wheelspin upshift after 0.6 s; hold after upshift)
+  // auto gearbox (decisions on road-speed rpm). LOCAL (game-side, see tools/physics-local.patch): with the pedal held it
+  // shifts up through EVERY gear and stays in top gear - no kickdown, no hunting on grades / at the drag wall.
+  //  - normal upshift near the power peak (rpm > up), or after 0.6 s of wheelspin;
+  //  - "stall upshift": pedal held, speed no longer rising for 0.7 s (drag / vmax wall, power-limited), next gear keeps rpm
+  //    above idle + 25 % of the band -> shift up anyway (slower acceleration is fine, the user wants top gear);
+  //  - while the pedal stays down the only downshift is a stall guard (road rpm near idle); after one the box won't
+  //    stall-upshift again until the pedal is lifted (no hunting); lift-off / braking / low speed use the classic rule.
   const rpmAt = g => Math.abs(fwdSpeed) / c.wheelR * c.gears[g - 1] * c.final * 9.549;
   if (s.holdT > 0) s.holdT -= dt; s.spinT = s.rpm > c.up && thr ? s.spinT + dt : 0;
-  if (s.grounded >= 2 && s.shift <= 0 && s.gear > 0) {
-    if (s.rpm > c.up && s.gear < c.gears.length && thr && (rpmAt(s.gear) > c.up * 0.92 || (s.spinT > 0.6 && fwdSpeed > 2))) { s.gear++; s.shift = c.shiftT * (A ? A.shiftT : 1); s.holdT = 1.0; s.spinT = 0; emit(s, 'shift', { value: s.gear }); }
-    else if (s.gear > 1 && s.holdT <= 0 && rpmAt(s.gear) < c.down && s.rpm < c.down + 900 && rpmAt(s.gear - 1) < c.up - 400) { s.gear--; s.shift = c.shiftT * 0.6; emit(s, 'shift', { value: s.gear }); }
+  const held = thr > 0.3 && brk < 0.1;
+  if (!held) { s.gbCap = 0; s.gbFlatT = 0; s.gbV = fwdSpeed; }
+  else { if (fwdSpeed > s.gbV + 0.25) { s.gbV = fwdSpeed; s.gbFlatT = 0; } else { s.gbFlatT += dt; if (fwdSpeed < s.gbV - 2) s.gbV = fwdSpeed; } }
+  if (s.manual) { if (s.gear > 1 && brk > 0.3 && !thr && Math.abs(fwdSpeed) < 1.5) { s.gear = 1; emit(s, 'shift', { value: 1 }); } } // MANUAL: no auto shifts; braking to a stop drops to 1st (no stall)
+  else if (s.grounded >= 2 && s.shift <= 0 && s.gear > 0) {
+    const top = c.gears.length, band = Math.max(500, c.redline - c.idle), stallRpm = c.idle + 0.06 * band;
+    const upNormal = s.rpm > c.up && s.gear < top && thr && (rpmAt(s.gear) > c.up * 0.92 || (s.spinT > 0.6 && fwdSpeed > 2));
+    const upStall = held && !s.gbCap && s.gear < top && s.holdT <= 0 && s.gbFlatT > 0.7 && fwdSpeed > 3 && rpmAt(s.gear + 1) > c.idle + 0.25 * band;
+    if (upNormal || upStall) { s.gear++; s.shift = c.shiftT * (A ? A.shiftT : 1); s.holdT = 1.0; s.spinT = 0; s.gbFlatT = 0; s.gbV = fwdSpeed; emit(s, 'shift', { value: s.gear }); }
+    else if (s.gear > 1 && s.holdT <= 0) {
+      if (held) { if (rpmAt(s.gear) < stallRpm && rpmAt(s.gear - 1) < c.up - 400) { s.gear--; s.shift = c.shiftT * 0.6; s.holdT = 1.0; s.gbCap = 1; s.gbFlatT = 0; emit(s, 'shift', { value: s.gear }); } }
+      else if (rpmAt(s.gear) < c.down && s.rpm < c.down + 900 && rpmAt(s.gear - 1) < c.up - 400) { s.gear--; s.shift = c.shiftT * 0.6; emit(s, 'shift', { value: s.gear }); }
+    }
   }
   // wheels: raycast along -up
   let ng = 0, slipMax = 0; const hold = !thr && !brk && speed < 0.7, hpw = s._a;
@@ -259,6 +275,19 @@ export function step(s, inp, dt, world, ext) {
 
 // ---------- arcade helpers ----------
 // top-speed governor: mods.topMul (<1) caps speed at topMul * the vehicle's measured flat top speed for the current mode
+/** LOCAL: manual gearbox. s.manual = true turns the auto box off; shiftGear(s, +1 | -1) -> new gear or 0 if refused.
+ *  Down from 1st at a standstill selects R; up from R selects 1st. A downshift that would over-rev (> redline + 5 %) is refused. */
+export function shiftGear(s, dir) {
+  const c = s.P, top = c.gears.length, fwdSpeed = dot(s.v, s.fwd);
+  const rpmAt = g => Math.abs(fwdSpeed) / c.wheelR * c.gears[g - 1] * c.final * 9.549;
+  let g = s.gear;
+  if (dir > 0) g = s.gear < 0 ? 1 : Math.min(top, s.gear + 1);
+  else if (s.gear > 1) { if (rpmAt(s.gear - 1) > c.redline * 1.05) return 0; g = s.gear - 1; }
+  else if (s.gear === 1 && Math.abs(fwdSpeed) < 1.0) g = -1;
+  if (g === s.gear) return 0;
+  s.gear = g; s.shift = c.shiftT * (s.mode === 'arcade' && c.arcade ? (c.arcade.shiftT || 1) : 1) * (dir > 0 ? 1 : 0.6); s.holdT = 1.0; s.spinT = 0; s.revT = 0;
+  emit(s, 'shift', { value: g }); return g;
+}
 export function topRef(P, mode, nitro) { const t = mode === 'normal' ? (P.vtop || P.vmax * 1.08) : (P.arcade.vtop || P.vtop || P.vmax * 1.08); return t * (nitro ? (P.vtopBoost || 1.13) : 1); }
 function topCap(s, nitro) { const k = s.mods.topMul; return k && k < 1 ? k * topRef(s.P, s.mode, nitro) : 0; }
 function arcadeDrift(s, inp, dt, A, fwdSpeed, beta, brk, thr) {

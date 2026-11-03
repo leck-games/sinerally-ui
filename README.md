@@ -5,6 +5,24 @@ This is the first numbered release of Sine Rally. It is built on the finished [S
 - Release: git tag `v0.1`, plus a GitHub Release named "Sine Rally V0.1".
 - The version is set in `js/version.js`, which drives the page title and the menu tag. For a new release, bump it, update `index.html`/`manifest.webmanifest`, tag it, and add the build to the versions repo (see its README).
 
+## Gearbox: hold the gas → top gear · MANUAL gears (V0.2-dev, 2026-11-03)
+- **Auto (default).** Hold the throttle and the box shifts up gear by gear to the **top gear and stays there**. It doesn't hunt at high hp, on grades or at the drag/top-speed equilibrium. While the pedal is held, it only downshifts if rpm falls near stall (idle + 6% of the band). Lifting off or braking downshifts as before.
+  - Root cause of the old behaviour: an upshift needed rpm > the up-shift point, which is never reached at the drag equilibrium or on a grade. The box stopped in 3rd–5th, and there was no throttle check on downshifts, so it could hunt.
+  - Fix: a held-throttle "plateau" upshift (speed stops rising for 0.7 s and the next gear still sits above idle + 25% of the band).
+  - Acceleration is unchanged (0–100 km/h stock is 2.6–5.8 s). Holding top gear costs about 5–10% stock top speed on the flat.
+- **MANUAL.** Set it in ☰ → CONTROLS & HUD → **GEARBOX [Auto | Manual]**. It's saved in `localStorage.sinerally_gearbox`, or use the URL param `?gearbox=manual`.
+  - Touch: while holding the gas pedal, swipe **up** (≥ 32 px) to shift up and **down** to shift down. A slow drift doesn't shift.
+  - Keys: **X** shifts up and **Z** shifts down (Y on QWERTZ). E/Q stay air pitch.
+  - No auto shifting. The rev limiter holds redline, the engine never stalls, and a downshift that would over-rev is refused. Braking to a stop drops to 1st, and from 1st at a standstill Z (or holding the brake) selects R.
+  - HUD: the gear numeral pops white on each shift, and a blue **M** marks manual mode. The engine sound follows the gear.
+  - The autopilot / test driver always uses Auto.
+- Physics: `js/phys` stays vendored. The gearbox change is `tools/physics-local.patch`, which `tools/sync-physics.sh` re-applies after each sync (it's the same patch as in SineHighway).
+- Test: `node tools/test-gearbox.cjs`, 24 checks.
+  - 0/6/10% grades, 5 vehicles × arcade/normal × stock/10000 hp, 65 s full throttle: top gear is reached with no downshift after it.
+  - Braking steps down gear by gear; 0–100 times; manual-mode physics; 20 hp shows no hunting.
+  - Browser: menu row, persistence, CDP-free synthetic touch swipe on the gas pedal, X/Z keys and Auto unchanged.
+  - It starts its own server and Chrome via `tools/lib-headless.cjs`.
+
 ## RIM HIGHWAY (V0.2-dev, 2026-11-02)
 - One closed **ring highway** runs just inside the world edge: 68.7 km long, 32 m wide (2×2 lanes, centre line). The rim slope starts outside its shoulder.
 - It is **banked like a NASCAR oval**: the bank follows the curve radius (up to 25.5° on the tightest curve), with spiral ramps, and fades to flat at junctions,
@@ -126,7 +144,7 @@ MED is the phone default. The choice is stored in `localStorage.sinerally_q3`; U
 
 Tests (headless Chrome, 844×390, serve the repo on :18941; test-update uses :18931):
 `node tools/test-plane.cjs` (23 checks), `node tools/test-gfx.cjs` (11 checks + fps/triangles per level → `shots/gfx_perf.json`),
-`node tools/test-ui.cjs` (35 checks incl. plane HUD), `node tools/test-update.cjs` (20 checks).
+`node tools/test-ui.cjs` (35 checks incl. plane HUD), `node tools/test-update.cjs` (20 checks), `node tools/test-gearbox.cjs` (24 checks, own server).
 
 
 ---
